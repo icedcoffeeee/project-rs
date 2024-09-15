@@ -1,0 +1,13 @@
+[package]
+name = "project-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colors-transform = "0.2.11"
+imgui = { git = "https://github.com/imgui-rs/imgui-rs", rev = "67f7f11", version = "0.12.0" }
+imgui-glow-renderer = { git = "https://github.com/imgui-rs/imgui-rs", rev = "67f7f11", version = "0.12.0" }
+imgui-sdl2-support = { git = "https://github.com/imgui-rs/imgui-rs", rev = "67f7f11", version = "0.12.0" }
+opencv = "0.92.3"
+rayon = "1.10.0"
+sdl2 = "0.36.0"
