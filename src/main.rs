@@ -1,5 +1,8 @@
 use project_rs::*;
 
+use colors_transform as colors;
+use colors_transform::Color;
+
 use opencv::core::*;
 use opencv::imgproc::*;
 use opencv::videoio::*;
@@ -12,8 +15,8 @@ fn main() -> Result<()> {
     let size = Size::new(imheightx3 * 4, imheightx3 * 3);
 
     let mut camera = VideoCapture::new(0, CAP_ANY)?;
-    let mut cam_img = image::Image::new(size.to_slice());
-    let mut proc_img = image::Image::new(size.to_slice());
+    let mut cam_img = image::Image::default();
+    let mut proc_img = image::Image::default();
 
     let mut col: [f32; 3] = [0., 0., 1.];
     let mut tol = 0.8;
@@ -29,14 +32,19 @@ fn main() -> Result<()> {
             .data_typed_mut::<Vec3b>()?
             .par_iter_mut()
             .for_each(|i| {
-                let pix: [u8; 3] = i.to_vec().try_into().unwrap();
-                let col: [u8; 3] = col.map(|c| (c * 255.) as u8);
+                let pix: [f32; 3] = i
+                    .to_vec()
+                    .iter()
+                    .map(|i| *i as f32 / 255.)
+                    .collect::<Vec<f32>>()
+                    .try_into()
+                    .unwrap();
                 let gate = rgb_to_hsl(pix)
                     .into_iter()
                     .zip(rgb_to_hsl(col))
                     .map(|(p, c)| (p - c).abs())
                     .all(|i| i < tol);
-                if gate {
+                if !gate {
                     *i = Vec3b::from([0, 0, 0]);
                 };
             });
@@ -62,7 +70,10 @@ fn main() -> Result<()> {
             .collapsible(false)
             .build(|| {
                 ui.color_edit3("Analyzed Color", &mut col);
-                ui.slider("Color Tolerance", 0., 1., &mut tol);
+                let [h, s, l] = rgb_to_hsl(col);
+                ui.text(format!("HSL: {} {} {}", h, s, l));
+
+                ui.slider("Color Tolerance", 0., 10., &mut tol);
                 ui.text(format!("FPS: {} fps", ui.io().framerate));
             });
 
@@ -81,20 +92,12 @@ impl SizeToSlice for Size {
     }
 }
 
-const TOL: f32 = 0.1;
-fn rgb_to_hsl(rgb: [u8; 3]) -> [f32; 3] {
-    let [r, g, b] = rgb.map(|i| i as f32 / 255.);
-    let (max, min) = (r.max(g).max(b), r.min(g).min(b));
-    let lum = (max + min) / 2.;
-    let (mut hue, mut sat) = (0., 0.);
-    let chroma = (max - min).abs();
-    if chroma > TOL {
-        sat += chroma / (1. + (2. * lum - 1.).abs());
-        if max - g < TOL {
-            hue += (b - r) / chroma + 2.;
-        } else if max - b < TOL {
-            hue += (r - g) / chroma + 4.;
-        }
-    }
-    return [hue, sat, lum];
+fn rgb_to_hsl(rgb: [f32; 3]) -> [f32; 3] {
+    let rgb: (f32, f32, f32) = rgb.map(|i| i as f32 * 255.).try_into().unwrap();
+    let hsl = colors::Rgb::from_tuple(&rgb).to_hsl();
+    [
+        hsl.get_hue() / 360. * 255.,
+        hsl.get_saturation() / 100. * 255.,
+        hsl.get_lightness() / 100. * 255.,
+    ]
 }
