@@ -65,7 +65,6 @@ where
             renderer
                 .gl_context()
                 .clear(imgui_glow_renderer::glow::COLOR_BUFFER_BIT);
-            renderer.gl_context().clear_color(0.6, 0.6, 0.6, 1.);
         }
         renderer.render(draw_data).unwrap();
         window.gl_swap_window();
