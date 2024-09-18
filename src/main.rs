@@ -1,4 +1,4 @@
-use project_rs::*;
+use project::*;
 
 use colors_transform as colors;
 use colors_transform::Color;
