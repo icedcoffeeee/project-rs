@@ -18,12 +18,11 @@ fn main() -> Result<()> {
     let mut red_light_img = image::Image::default();
     let mut processed_img = image::Image::default();
 
-    let mut col: [f32; 3] = [0., 0., 1.];
-    let mut tol = 10.;
+    let mut frame_sleep: u32 = 60;
     let mut i = 0;
 
     window::begin(|renderer, ui| {
-        sleep(Duration::new(0, 1e9 as u32 / 60));
+        sleep(Duration::new(0, 1e9 as u32 / frame_sleep));
         i = (i + 1) % 2;
         if i == 0 {
             unsafe {
@@ -92,9 +91,8 @@ fn main() -> Result<()> {
             .resizable(false)
             .collapsible(false)
             .build(|| {
-                ui.color_edit3("Analyzed Color", &mut col);
-                ui.slider("Color Tolerance (hue degrees)", 0., 50., &mut tol);
-                ui.text(format!("FPS: {} fps", ui.io().framerate));
+                ui.slider("Frame Sleep (fps)", 1, 100, &mut frame_sleep);
+                ui.text(format!("FPS: {} (fps)", ui.io().framerate));
             });
         Ok(())
     });
