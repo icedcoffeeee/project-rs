@@ -1,110 +1,62 @@
-use std::thread::sleep;
-use std::time::Duration;
-
-use imgui_glow_renderer::glow::HasContext;
 use project::*;
 
-use opencv::core::*;
-use opencv::imgproc::*;
-use opencv::videoio::*;
-use opencv::Result;
-
 fn main() -> Result<()> {
-    let imheightx3 = 100;
-    let img_size = Size::new(imheightx3 * 4, imheightx3 * 3);
+    let mut base_px = 100;
+    let aspects = [[4, 3], [16, 9]];
+    let mut aspect_idx = 0;
 
-    let mut camera = VideoCapture::new(0, CAP_ANY)?;
-    let mut non_light_img = image::Image::default();
-    let mut red_light_img = image::Image::default();
-    let mut processed_img = image::Image::default();
+    let mut cameras = [
+        VideoCapture::new(0, CAP_ANY)?,
+        VideoCapture::new(1, CAP_ANY)?,
+    ];
 
-    let mut frame_sleep: u32 = 60;
-    let mut i = 0;
+    let mut feeds = [
+        image::Image::default(),
+        image::Image::default(),
+        image::Image::default(),
+    ];
 
     window::begin(|renderer, ui| {
-        sleep(Duration::new(0, 1e9 as u32 / frame_sleep));
-        i = (i + 1) % 2;
-        if i == 0 {
-            unsafe {
-                renderer.gl_context().clear_color(0., 0., 0., 1.);
-            }
-            camera.read(&mut non_light_img.mat)?;
-            cvt_color_def(
-                &non_light_img.mat.clone(),
-                &mut non_light_img.mat,
-                COLOR_BGR2RGB,
-            )?;
-            resize_def(&non_light_img.mat.clone(), &mut non_light_img.mat, img_size)?;
-        } else {
-            unsafe {
-                renderer.gl_context().clear_color(1., 0., 0., 1.);
-            }
-            camera.read(&mut red_light_img.mat)?;
-            cvt_color_def(
-                &red_light_img.mat.clone(),
-                &mut red_light_img.mat,
-                COLOR_BGR2RGB,
-            )?;
-            resize_def(&red_light_img.mat.clone(), &mut red_light_img.mat, img_size)?;
-            subtract_def(
-                &red_light_img.mat,
-                &non_light_img.mat,
-                &mut processed_img.mat,
-            )?;
+        let aspect = aspects[aspect_idx];
+        let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
+
+        for (n, camera) in cameras.iter_mut().enumerate() {
+            camera.read(&mut feeds[n].mat)?;
         }
-        if red_light_img.mat.empty() || processed_img.mat.empty() {
-            return Ok(());
-        };
-        ui.window("Non Light")
-            .position([30., 30.], imgui::Condition::Once)
-            .content_size(img_size.to_array())
-            .resizable(false)
-            .collapsible(false)
-            .build(|| non_light_img.make(renderer).build(ui));
 
-        ui.window("Red Light")
-            .position(
-                [30. + 50. + img_size.to_array()[0], 30.],
-                imgui::Condition::Once,
-            )
-            .content_size(img_size.to_array())
-            .resizable(false)
-            .collapsible(false)
-            .build(|| red_light_img.make(renderer).build(ui));
+        add_def(
+            &feeds[0].mat.clone(),
+            &feeds[1].mat.clone(),
+            &mut feeds[2].mat,
+        )?;
 
-        ui.window("Processed")
-            .position(
-                [30., 30. + 50. + img_size.to_array()[1]],
-                imgui::Condition::Once,
-            )
-            .content_size(img_size.to_array())
-            .resizable(false)
-            .collapsible(false)
-            .build(|| processed_img.make(renderer).build(ui));
+        for (n, feed) in feeds.iter_mut().enumerate() {
+            resize_def(&feed.mat.clone(), &mut feed.mat, img_size)?;
+            ui.window(format!("Camera {}", n))
+                .content_size(img_size.to_array())
+                .build(|| {
+                    feed.make(renderer).build(ui);
+                });
+        }
 
         ui.window("Control Panel")
-            .position(
-                [30. + 2. * (50. + img_size.to_array()[0]), 30.],
-                imgui::Condition::Once,
-            )
-            .content_size([500., 500.])
-            .resizable(false)
-            .collapsible(false)
+            .size([500., 1000.], imgui::Condition::Once)
             .build(|| {
-                ui.slider("Frame Sleep (fps)", 1, 100, &mut frame_sleep);
-                ui.text(format!("FPS: {} (fps)", ui.io().framerate));
+                ui.slider("Image base size", 1, 400, &mut base_px);
+
+                if let Some(_) = ui.begin_combo("Aspect ratio", format!("{:#?}", aspect)) {
+                    for (n, aspect) in aspects.iter().enumerate() {
+                        if ui.selectable(format!("{:#?}", aspect)) {
+                            aspect_idx = n;
+                        };
+                        if aspect_idx == n {
+                            ui.set_item_default_focus();
+                        }
+                    }
+                };
             });
         Ok(())
     });
 
     Ok(())
-}
-
-trait ToArray2 {
-    fn to_array(self) -> [f32; 2];
-}
-impl ToArray2 for Size {
-    fn to_array(self) -> [f32; 2] {
-        [self.width as _, self.height as _]
-    }
 }

@@ -3,6 +3,14 @@ use igr::{glow, TextureMap};
 use imgui_glow_renderer as igr;
 use opencv::core::{self as cv, MatTraitConst, MatTraitConstManual};
 
+/// usage:
+/// ```
+/// window::begin(|renderer, ui| {
+///     ui.window(title).build(|| {
+///             image.make(renderer).build(ui);
+///     });
+/// }
+/// ```
 #[derive(Default, Debug)]
 pub struct Image {
     pub mat: cv::Mat,
