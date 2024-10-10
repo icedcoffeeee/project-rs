@@ -1,4 +1,3 @@
-use opencv::imgproc::warp_affine_def;
 use project::*;
 
 fn main() -> Result<()> {
@@ -65,8 +64,9 @@ fn main() -> Result<()> {
                     }
                 };
 
-                ui.slider("Offset X", 0, 100, &mut offset_x);
-                ui.slider("Offset Y", 0, 100, &mut offset_y);
+                let size = img_size.to_array();
+                ui.slider("Offset X", 0, size[0] as i32, &mut offset_x);
+                ui.slider("Offset Y", 0, size[1] as i32, &mut offset_y);
             });
         Ok(())
     });
