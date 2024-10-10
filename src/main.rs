@@ -1,8 +1,9 @@
+use opencv::imgproc::warp_affine_def;
 use project::*;
 
 fn main() -> Result<()> {
-    let mut base_px = 100;
     let aspects = [[4, 3], [16, 9]];
+    let mut base_px = 100;
     let mut aspect_idx = 0;
 
     let mut cameras = [
@@ -16,12 +17,21 @@ fn main() -> Result<()> {
         image::Image::default(),
     ];
 
+    let mut offset_x = 0;
+    let mut offset_y = 0;
+
     window::begin(|renderer, ui| {
         let aspect = aspects[aspect_idx];
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
         for (n, camera) in cameras.iter_mut().enumerate() {
             camera.read(&mut feeds[n].mat)?;
+        }
+
+        if offset_x > 0 || offset_y > 0 {
+            let size = feeds[1].mat.size()?;
+            let mat = Mat::from_slice_2d(&[[1, 0, offset_x], [0, 1, -offset_y]])?;
+            warp_affine_def(&feeds[1].mat.clone(), &mut feeds[1].mat, &mat, size)?;
         }
 
         add_def(
@@ -54,6 +64,9 @@ fn main() -> Result<()> {
                         }
                     }
                 };
+
+                ui.slider("Offset X", 0, 100, &mut offset_x);
+                ui.slider("Offset Y", 0, 100, &mut offset_y);
             });
         Ok(())
     });

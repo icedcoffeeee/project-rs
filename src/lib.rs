@@ -1,6 +1,6 @@
 pub use opencv::core::*;
-pub use opencv::imgproc::*;
-pub use opencv::videoio::*;
+pub use opencv::imgproc::resize_def;
+pub use opencv::videoio::{VideoCapture, VideoCaptureTrait, CAP_ANY};
 pub use opencv::Result;
 
 pub mod image;
