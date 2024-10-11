@@ -16,8 +16,8 @@ fn main() -> Result<()> {
         image::Image::default(),
     ];
 
-    let mut offset_x = 0;
-    let mut offset_y = 0;
+    let mut offset_x = 0.;
+    let mut offset_y = 0.;
 
     window::begin(|renderer, ui| {
         let aspect = aspects[aspect_idx];
@@ -27,13 +27,13 @@ fn main() -> Result<()> {
             camera.read(&mut feeds[n].mat)?;
         }
 
-        if offset_x > 0 || offset_y > 0 {
+        if offset_x > 0. || offset_y > 0. {
             let size = feeds[1].mat.size()?;
-            let mat = Mat::from_slice_2d(&[[1, 0, offset_x], [0, 1, -offset_y]])?;
+            let mat = Mat::from_slice_2d::<f32>(&[[1., 0., offset_x], [0., 1., -offset_y]])?;
             warp_affine_def(&feeds[1].mat.clone(), &mut feeds[1].mat, &mat, size)?;
         }
 
-        add_def(
+        subtract_def(
             &feeds[0].mat.clone(),
             &feeds[1].mat.clone(),
             &mut feeds[2].mat,
@@ -41,7 +41,7 @@ fn main() -> Result<()> {
 
         for (n, feed) in feeds.iter_mut().enumerate() {
             resize_def(&feed.mat.clone(), &mut feed.mat, img_size)?;
-            ui.window(format!("Camera {}", n))
+            ui.window(format!("Camera {}", n + 1))
                 .content_size(img_size.to_array())
                 .build(|| {
                     feed.make(renderer).build(ui);
@@ -49,13 +49,13 @@ fn main() -> Result<()> {
         }
 
         ui.window("Control Panel")
-            .size([500., 1000.], imgui::Condition::Once)
+            .content_size([500., 500.])
             .build(|| {
                 ui.slider("Image base size", 1, 400, &mut base_px);
 
-                if let Some(_) = ui.begin_combo("Aspect ratio", format!("{:#?}", aspect)) {
+                if let Some(_) = ui.begin_combo("Aspect ratio", format!("{:?}", aspect)) {
                     for (n, aspect) in aspects.iter().enumerate() {
-                        if ui.selectable(format!("{:#?}", aspect)) {
+                        if ui.selectable(format!("{:?}", aspect)) {
                             aspect_idx = n;
                         };
                         if aspect_idx == n {
@@ -65,8 +65,8 @@ fn main() -> Result<()> {
                 };
 
                 let size = img_size.to_array();
-                ui.slider("Offset X", 0, size[0] as i32, &mut offset_x);
-                ui.slider("Offset Y", 0, size[1] as i32, &mut offset_y);
+                ui.slider("Offset X", 0., size[0], &mut offset_x);
+                ui.slider("Offset Y", 0., size[1], &mut offset_y);
             });
         Ok(())
     });
