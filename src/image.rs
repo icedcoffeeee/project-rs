@@ -2,6 +2,7 @@ use igr::glow::HasContext;
 use igr::{glow, TextureMap};
 use imgui_glow_renderer as igr;
 use opencv::core::{self as cv, MatTraitConst, MatTraitConstManual};
+use opencv::imgproc::{cvt_color_def, COLOR_BGR2RGB};
 
 /// usage:
 /// ```
@@ -24,6 +25,7 @@ impl Image {
             self.init(renderer)
         }
         let gl = renderer.gl_context();
+        cvt_color_def(&self.mat.clone(), &mut self.mat, COLOR_BGR2RGB).unwrap();
         unsafe {
             gl.bind_texture(glow::TEXTURE_2D, self.texture);
             gl.tex_parameter_i32(

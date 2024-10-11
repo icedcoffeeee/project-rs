@@ -35,12 +35,12 @@ where
     };
 
     let mut imgui = imgui::Context::create();
-    imgui.set_ini_filename(None);
+    //imgui.set_ini_filename(None);
     imgui.set_log_filename(None);
     imgui
         .fonts()
         .add_font(&[FontSource::DefaultFontData { config: None }]);
-    imgui.style_mut().use_light_colors();
+    imgui.style_mut().use_dark_colors();
 
     let mut event_pump = sdl.event_pump().unwrap();
     let mut platform = iss::SdlPlatform::init(&mut imgui);
