@@ -92,16 +92,19 @@ fn calibrate(camera1: &Mat, camera2: &Mat) -> Result<Mat> {
     let mut matches = Vector::new();
     matcher.add(&descriptors1)?;
     matcher.match__def(&descriptors2, &mut matches)?;
+
     let mut matches = matches.to_vec();
     matches.sort_by(|x, y| x.distance.total_cmp(&y.distance));
-    for _ in 0..(matches.len() / 10) {
-        matches.pop();
+    if matches.len() < 4 {
+        println!("Not enough matches");
+        return Ok(Mat::eye(3, 3, CV_32F)?.to_mat()?);
+    } else {
+        // cut the last 10%
+        for _ in 0..(matches.len() / 10) {
+            matches.pop();
+        }
     }
 
-    if matches.len() == 0 {
-        println!("Could not get keypoint matches.");
-        return Ok(Mat::default());
-    }
     let (mut points1, mut points2) = (Vec::new(), Vec::new());
     for match_ in matches {
         points1.push(keypoints1.get(match_.train_idx as usize)?.pt());
