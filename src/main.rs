@@ -6,9 +6,12 @@ fn main() -> Result<()> {
     let mut aspect_idx = 0;
 
     let mut cameras = [
-        VideoCapture::new(0, CAP_ANY)?,
-        VideoCapture::new(1, CAP_ANY)?,
+        videoio::VideoCapture::new(0, videoio::CAP_ANY)?,
+        videoio::VideoCapture::new(1, videoio::CAP_ANY)?,
     ];
+    for cam in &mut cameras {
+        cam.set(videoio::CAP_PROP_FPS, 30.)?;
+    }
 
     let mut feeds = [
         image::Image::default(),
@@ -87,16 +90,13 @@ fn calibrate(camera1: &Mat, camera2: &Mat) -> Result<Mat> {
 
     let mut matcher = features2d::DescriptorMatcher::create("BruteForce-Hamming")?;
     let mut matches = Vector::new();
-    let mut descriptors = Vector::<Mat>::new();
-    descriptors.push(descriptors1);
-    descriptors.push(descriptors2);
-    matcher.match__def(&descriptors, &mut matches)?;
+    matcher.add(&descriptors1)?;
+    matcher.match__def(&descriptors2, &mut matches)?;
     let mut matches = matches.to_vec();
     matches.sort_by(|x, y| x.distance.total_cmp(&y.distance));
     for _ in 0..(matches.len() / 10) {
         matches.pop();
     }
-    println!("matched: {:?}", matches);
 
     if matches.len() == 0 {
         println!("Could not get keypoint matches.");
@@ -104,8 +104,8 @@ fn calibrate(camera1: &Mat, camera2: &Mat) -> Result<Mat> {
     }
     let (mut points1, mut points2) = (Vec::new(), Vec::new());
     for match_ in matches {
-        points1.push(keypoints1.get(match_.query_idx as usize)?.pt());
-        points2.push(keypoints2.get(match_.train_idx as usize)?.pt());
+        points1.push(keypoints1.get(match_.train_idx as usize)?.pt());
+        points2.push(keypoints2.get(match_.query_idx as usize)?.pt());
     }
     let mut mask = Mat::default();
     Ok(calib3d::find_homography(
