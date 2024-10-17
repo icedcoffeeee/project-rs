@@ -43,8 +43,8 @@ where
     imgui.style_mut().use_dark_colors();
 
     let mut event_pump = sdl.event_pump().unwrap();
-    let mut platform = iss::SdlPlatform::init(&mut imgui);
-    let mut renderer = igr::AutoRenderer::initialize(gl_context, &mut imgui).unwrap();
+    let mut platform = iss::SdlPlatform::new(&mut imgui);
+    let mut renderer = igr::AutoRenderer::new(gl_context, &mut imgui).unwrap();
 
     'main: loop {
         for event in event_pump.poll_iter() {

@@ -7,7 +7,7 @@ fn main() -> Result<()> {
 
     let mut cameras = [
         videoio::VideoCapture::new(0, videoio::CAP_ANY)?,
-        videoio::VideoCapture::new(1, videoio::CAP_ANY)?,
+        //videoio::VideoCapture::new(1, videoio::CAP_ANY)?,
     ];
     for cam in &mut cameras {
         cam.set(videoio::CAP_PROP_FPS, 30.)?;
@@ -25,9 +25,11 @@ fn main() -> Result<()> {
         let aspect = aspects[aspect_idx];
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
-        for (n, camera) in cameras.iter_mut().enumerate() {
-            camera.read(&mut feeds[n].mat)?;
-        }
+        //for (n, camera) in cameras.iter_mut().enumerate() {
+        //    camera.read(&mut feeds[n].mat)?;
+        //}
+        cameras[0].read(&mut feeds[0].mat)?;
+        cameras[0].read(&mut feeds[1].mat)?;
 
         if homo.size()?.area() > 0 {
             let clone = feeds[1].mat.clone();
