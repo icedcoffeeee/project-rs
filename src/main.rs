@@ -68,7 +68,7 @@ fn main() -> Result<()> {
                 };
 
                 if ui.button("Calibrate") {
-                    homo = calibrate(&feeds[0].mat, &feeds[1].mat).unwrap();
+                    calibrate(&feeds[0].mat, &feeds[1].mat, &mut homo).unwrap();
                 };
                 ui.same_line();
                 if ui.button("Image") {
@@ -81,9 +81,9 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn calibrate(camera1: &Mat, camera2: &Mat) -> Result<Mat> {
+fn calibrate(camera1: &Mat, camera2: &Mat, homo: &mut Mat) -> Result<()> {
     let mut orb = features2d::ORB::create_def()?;
-    let mask = Mat::ones_size(camera1.size()?, camera1.typ())?;
+    let mut mask = Mat::default();
 
     let (mut keypoints1, mut descriptors1) = (Vector::new(), Mat::default());
     let (mut keypoints2, mut descriptors2) = (Vector::new(), Mat::default());
@@ -99,7 +99,7 @@ fn calibrate(camera1: &Mat, camera2: &Mat) -> Result<Mat> {
     matches.sort_by(|x, y| x.distance.total_cmp(&y.distance));
     if matches.len() < 4 {
         println!("Not enough matches");
-        return Ok(Mat::eye(3, 3, CV_32F)?.to_mat()?);
+        return Ok(());
     } else {
         // cut the last 10%
         for _ in 0..(matches.len() / 10) {
@@ -112,14 +112,15 @@ fn calibrate(camera1: &Mat, camera2: &Mat) -> Result<Mat> {
         points1.push(keypoints1.get(match_.train_idx as usize)?.pt());
         points2.push(keypoints2.get(match_.query_idx as usize)?.pt());
     }
-    let mut mask = Mat::default();
-    Ok(calib3d::find_homography(
+    *homo = calib3d::find_homography(
         &Mat::from_slice(points1.as_slice())?,
         &Mat::from_slice(points2.as_slice())?,
         &mut mask,
         calib3d::RANSAC,
         0.5,
-    )?)
+    )?;
+    println!("{:?}", homo.to_vec_2d::<VecN<f64, 1>>()?);
+    Ok(())
 }
 
 fn save_pic(mat: &Mat) {
