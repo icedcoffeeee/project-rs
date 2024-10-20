@@ -13,6 +13,7 @@ OpenCV Setup:
     ```
     OPENCV_LINK_LIBS=opencv_world4100.lib
     OPENCV_LINK_PATHS=C:\tools\opencv\build\x64\vc16\lib
+    OPENCV_INCLUDE_PATHS=C:\tools\opencv\build\include
     OPENCV_MSVC_CRT=static
     PATH=$PATH;C:\tools\opencv\build\x64\vc16\bin
     PATH=$PATH;C:\Program Files\LLVM\bin

@@ -1,0 +1,59 @@
+name: Rust
+
+on:
+  push:
+    branches:
+    - dual
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ubuntu:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Dependencies
+      run: sudo apt install libclang-dev libopencv-dev
+    - name: Build
+      run: cargo build --release
+    - name: Copy
+      run: cp ./imgui.ini ./target/release
+    - name: Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: project-ubuntu
+        path: ./target/release/
+
+  windows:
+
+    runs-on: windows-latest
+
+    env:
+      OPENCV_LINK_LIBS: opencv_world4100.lib
+      OPENCV_LINK_PATHS: C:\tools\opencv\build\x64\vc16\lib
+      OPENCV_INCLUDE_PATHS: C:\tools\opencv\build\include
+      OPENCV_MSVC_CRT: static
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install OpenCV
+      uses: crazy-max/ghaction-chocolatey@v3
+      with:
+        args: install opencv
+    - name: Append PATH
+      run: Add-Content $env:GITHUB_PATH "C:\tools\opencv\build\x64\vc16\bin"
+    - name: Build
+      run: cargo build --release
+    - name: Copy
+      run: Copy-Item .\imgui.ini -Destination .\target\release\; Copy-Item C:\tools\opencv\build\x64\vc16\bin\opencv_world4100.dll .\target\release\
+    - name: Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: project-windows
+        path: |
+          .\target\release\project.exe
+          .\target\release\imgui.ini
+          .\target\release\*.dll
