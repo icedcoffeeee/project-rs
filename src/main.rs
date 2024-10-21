@@ -31,7 +31,7 @@ fn main() -> Result<()> {
         cameras[0].read(&mut feeds[0].mat)?;
         cameras[0].read(&mut feeds[1].mat)?;
 
-        if homo.size()?.area() > 0 {
+        if homo.rows() > 0 {
             let clone = feeds[1].mat.clone();
             imgproc::warp_perspective_def(&clone, &mut feeds[1].mat, &homo, clone.size()?)?;
         }
@@ -73,6 +73,14 @@ fn main() -> Result<()> {
                 ui.same_line();
                 if ui.button("Image") {
                     save_pic(&feeds[0].mat);
+                };
+                ui.same_line();
+                if ui.button("Subtract Captured") {
+                    let m1 = imgcodecs::imread_def("output/pol-0.png").unwrap();
+                    let m2 = imgcodecs::imread_def("output/pol-1.png").unwrap();
+                    let mut m3 = Mat::default();
+                    subtract_def(&m1, &m2, &mut m3).unwrap();
+                    save_pic(&m3);
                 };
             });
         Ok(())
