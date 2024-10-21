@@ -13,8 +13,9 @@ where
 {
     let sdl = sdl2::init().unwrap();
     let video_subsystem = sdl.video().unwrap();
+    let mode = video_subsystem.current_display_mode(0).unwrap();
     let window = video_subsystem
-        .window("app", 1920 / 4 * 3, 1080 / 4 * 3)
+        .window("app", mode.w as u32 / 4 * 3, mode.h as u32 / 4 * 3)
         .allow_highdpi()
         .opengl()
         .position_centered()
