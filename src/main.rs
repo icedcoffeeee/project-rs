@@ -19,7 +19,7 @@ fn main() -> Result<()> {
         image::Image::default(),
     ];
 
-    let mut homo = Mat::default();
+    let mut homography = Mat::default();
 
     window::begin(|renderer, ui| {
         let aspect = aspects[aspect_idx];
@@ -31,9 +31,9 @@ fn main() -> Result<()> {
         cameras[0].read(&mut feeds[0].mat)?;
         cameras[0].read(&mut feeds[1].mat)?;
 
-        if homo.rows() > 0 {
+        if homography.rows() > 0 {
             let clone = feeds[1].mat.clone();
-            imgproc::warp_perspective_def(&clone, &mut feeds[1].mat, &homo, clone.size()?)?;
+            imgproc::warp_perspective_def(&clone, &mut feeds[1].mat, &homography, clone.size()?)?;
         }
 
         subtract_def(
@@ -68,7 +68,7 @@ fn main() -> Result<()> {
                 };
 
                 if ui.button("Calibrate") {
-                    calibrate(&feeds[0].mat, &feeds[1].mat, &mut homo).unwrap();
+                    calibrate(&feeds[0].mat, &feeds[1].mat, &mut homography).unwrap();
                 };
                 ui.same_line();
                 if ui.button("Image") {
