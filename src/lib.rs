@@ -1,17 +1,16 @@
-pub use opencv::{imgcodecs, imgproc, videoio, Result};
-pub use opencv::{core::*, prelude::*};
-
-pub use std::fs;
-
 pub mod calibrate;
 pub mod image;
 pub mod window;
 
-pub trait Size2Array {
+pub use opencv::{core::*, prelude::*};
+pub use opencv::{imgcodecs, imgproc, videoio, Result};
+pub use std::fs;
+
+pub trait SizeToArray {
     fn to_array(self) -> [f32; 2];
 }
 
-impl Size2Array for Size {
+impl SizeToArray for Size {
     fn to_array(self) -> [f32; 2] {
         [self.width as _, self.height as _]
     }

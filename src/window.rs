@@ -57,7 +57,7 @@ where
         platform.prepare_frame(&mut imgui, &window, &event_pump);
 
         let mut ui = imgui.new_frame();
-        let _ = app(&mut renderer, &mut ui).unwrap();
+        app(&mut renderer, &mut ui).unwrap();
 
         let draw_data = imgui.render();
 
