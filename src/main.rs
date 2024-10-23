@@ -38,11 +38,14 @@ fn main() -> Result<()> {
             imgproc::warp_perspective_def(&clone, &mut feeds[1].mat, &homography, clone.size()?)?;
         }
 
-        subtract_def(
-            &feeds[0].mat.clone(),
-            &feeds[1].mat.clone(),
-            &mut feeds[2].mat,
-        )?;
+        let mut f1 = Mat::default();
+        let mut f2 = Mat::default();
+        feeds[0].mat.convert_to_def(&mut f1, CV_32FC3)?;
+        feeds[1].mat.convert_to_def(&mut f2, CV_32FC3)?;
+        subtract_def(&f1, &f2, &mut feeds[2].mat)?;
+        abs(&feeds[2].mat.clone())?
+            .to_mat()?
+            .convert_to_def(&mut feeds[2].mat, CV_8UC3)?;
 
         for (n, feed) in feeds.iter_mut().enumerate() {
             imgproc::resize_def(&feed.mat.clone(), &mut feed.mat, img_size)?;
