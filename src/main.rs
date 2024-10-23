@@ -135,7 +135,7 @@ fn calibrate(camera1: &Mat, camera2: &Mat, homography: &mut Mat) -> Result<()> {
     return Ok(());
 }
 
-fn save_pic(mat: &Mat) {
+fn save_pic(mat: &Mat, name: &str) {
     let mut i = 0;
     let mut filename;
 
@@ -143,7 +143,7 @@ fn save_pic(mat: &Mat) {
         fs::create_dir(OUTPUT_FOLDER).unwrap();
     }
     while {
-        filename = format!("{}/{}.png", OUTPUT_FOLDER, i);
+        filename = format!("{}/{}-{}.png", OUTPUT_FOLDER, i, name);
         fs::metadata(&filename).is_ok()
     } {
         i += 1;
