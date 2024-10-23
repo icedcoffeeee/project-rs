@@ -79,8 +79,12 @@ fn main() -> Result<()> {
                 if ui.button("reset calibration") {
                     homography = Mat::default();
                 };
-                if ui.button("image") {
-                    save_pic(&feeds[0].mat);
+                if ui.button("save feed 1") {
+                    save_pic(&feeds[0].mat, "f1");
+                };
+                ui.same_line();
+                if ui.button("save feed 3") {
+                    save_pic(&feeds[2].mat, "f3");
                 };
             });
         return Ok(());
