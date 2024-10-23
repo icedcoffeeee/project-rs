@@ -1,8 +1,9 @@
-pub use opencv::{calib3d, features2d, imgcodecs, imgproc, videoio, Result};
+pub use opencv::{imgcodecs, imgproc, videoio, Result};
 pub use opencv::{core::*, prelude::*};
 
 pub use std::fs;
 
+pub mod calibrate;
 pub mod image;
 pub mod window;
 
