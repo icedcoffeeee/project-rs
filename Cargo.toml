@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 colors-transform = "0.2.11"
-imgui = "0.12.0"
+imgui = { version = "0.12.0", features = ["docking"] }
 imgui-glow-renderer = "0.13.0"
 imgui-sdl2-support = "0.13.0"
 opencv = "0.92.3"

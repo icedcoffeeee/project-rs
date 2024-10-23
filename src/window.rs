@@ -1,9 +1,8 @@
-use igr::glow;
-use igr::glow::HasContext;
+use igr::glow::{self, HasContext};
+use imgui::{FontSource, Ui};
 use imgui_glow_renderer as igr;
 use imgui_sdl2_support as iss;
 
-use imgui::{FontSource, Ui};
 use opencv::Result;
 use sdl2::{event::Event, video::GLProfile};
 
@@ -58,14 +57,12 @@ where
         platform.prepare_frame(&mut imgui, &window, &event_pump);
 
         let mut ui = imgui.new_frame();
-        let _ = app(&mut renderer, &mut ui);
+        let _ = app(&mut renderer, &mut ui).unwrap();
 
         let draw_data = imgui.render();
 
         unsafe {
-            renderer
-                .gl_context()
-                .clear(imgui_glow_renderer::glow::COLOR_BUFFER_BIT);
+            renderer.gl_context().clear(glow::COLOR_BUFFER_BIT);
         }
         renderer.render(draw_data).unwrap();
         window.gl_swap_window();

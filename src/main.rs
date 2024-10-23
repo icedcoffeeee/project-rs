@@ -1,5 +1,7 @@
 use project::*;
 
+const OUTPUT_FOLDER: &str = "output";
+
 fn main() -> Result<()> {
     let aspects = [[4, 3], [16, 9]];
     let mut base_px = 100;
@@ -54,9 +56,9 @@ fn main() -> Result<()> {
         ui.window("Control Panel")
             .content_size([500., 500.])
             .build(|| {
-                ui.slider("Image base size", 1, 400, &mut base_px);
+                ui.slider("image base size", 1, 400, &mut base_px);
 
-                if let Some(_) = ui.begin_combo("Aspect ratio", format!("{:?}", aspect)) {
+                if let Some(_) = ui.begin_combo("aspect ratio", format!("{:?}", aspect)) {
                     for (n, aspect) in aspects.iter().enumerate() {
                         if ui.selectable(format!("{:?}", aspect)) {
                             aspect_idx = n;
@@ -67,29 +69,24 @@ fn main() -> Result<()> {
                     }
                 };
 
-                if ui.button("Calibrate") {
+                if ui.button("calibrate") {
                     calibrate(&feeds[0].mat, &feeds[1].mat, &mut homography).unwrap();
                 };
                 ui.same_line();
-                if ui.button("Image") {
+                if ui.button("reset calibration") {
+                    homography = Mat::default();
+                };
+                if ui.button("image") {
                     save_pic(&feeds[0].mat);
                 };
-                ui.same_line();
-                if ui.button("Subtract Captured") {
-                    let m1 = imgcodecs::imread_def("output/pol-0.png").unwrap();
-                    let m2 = imgcodecs::imread_def("output/pol-1.png").unwrap();
-                    let mut m3 = Mat::default();
-                    subtract_def(&m1, &m2, &mut m3).unwrap();
-                    save_pic(&m3);
-                };
             });
-        Ok(())
+        return Ok(());
     });
 
-    Ok(())
+    return Ok(());
 }
 
-fn calibrate(camera1: &Mat, camera2: &Mat, homo: &mut Mat) -> Result<()> {
+fn calibrate(camera1: &Mat, camera2: &Mat, homography: &mut Mat) -> Result<()> {
     let mut orb = features2d::ORB::create_def()?;
     let mut mask = Mat::default();
 
@@ -120,25 +117,26 @@ fn calibrate(camera1: &Mat, camera2: &Mat, homo: &mut Mat) -> Result<()> {
         points1.push(keypoints1.get(match_.train_idx as usize)?.pt());
         points2.push(keypoints2.get(match_.query_idx as usize)?.pt());
     }
-    *homo = calib3d::find_homography(
+    *homography = calib3d::find_homography(
         &Mat::from_slice(points1.as_slice())?,
         &Mat::from_slice(points2.as_slice())?,
         &mut mask,
         calib3d::RANSAC,
         0.5,
     )?;
-    println!("{:?}", homo.to_vec_2d::<VecN<f64, 1>>()?);
-    Ok(())
+    println!("{:?}", homography.to_vec_2d::<VecN<f64, 1>>()?);
+    return Ok(());
 }
 
 fn save_pic(mat: &Mat) {
     let mut i = 0;
-    if !fs::metadata("output/").is_ok() {
-        fs::create_dir("output").unwrap();
-    }
     let mut filename;
+
+    if !fs::metadata(OUTPUT_FOLDER).is_ok() {
+        fs::create_dir(OUTPUT_FOLDER).unwrap();
+    }
     while {
-        filename = format!("output/pol-{}.png", i);
+        filename = format!("{}/{}.png", OUTPUT_FOLDER, i);
         fs::metadata(&filename).is_ok()
     } {
         i += 1;
