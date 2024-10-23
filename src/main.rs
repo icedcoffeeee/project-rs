@@ -22,6 +22,7 @@ fn main() -> Result<()> {
     ];
 
     let mut homography = Mat::default();
+    let mut writer: Option<videoio::VideoWriter> = None;
 
     window::begin(|renderer, ui| {
         let aspect = aspects[aspect_idx];
@@ -55,13 +56,19 @@ fn main() -> Result<()> {
                     feed.make(renderer).build(ui);
                 });
         }
+        if let Some(writer) = writer.as_mut() {
+            writer.write(&feeds[2].mat)?;
+        }
 
         ui.window("Control Panel")
             .content_size([500., 500.])
             .build(|| {
                 ui.slider("image base size", 1, 400, &mut base_px);
 
-                if let Some(_) = ui.begin_combo("aspect ratio", format!("{:?}", aspect)) {
+                if ui
+                    .begin_combo("aspect ratio", format!("{:?}", aspect))
+                    .is_some()
+                {
                     for (n, aspect) in aspects.iter().enumerate() {
                         if ui.selectable(format!("{:?}", aspect)) {
                             aspect_idx = n;
@@ -73,19 +80,39 @@ fn main() -> Result<()> {
                 };
 
                 if ui.button("calibrate") {
-                    calibrate(&feeds[0].mat, &feeds[1].mat, &mut homography).unwrap();
+                    calibrate::get_homography(&feeds[0].mat, &feeds[1].mat, &mut homography)
+                        .unwrap();
                 };
                 ui.same_line();
                 if ui.button("reset calibration") {
                     homography = Mat::default();
                 };
                 if ui.button("save feed 1") {
-                    save_pic(&feeds[0].mat, "f1");
+                    imgcodecs::imwrite_def(&get_save_filename("f2.png"), &feeds[1].mat).unwrap();
                 };
                 ui.same_line();
                 if ui.button("save feed 3") {
-                    save_pic(&feeds[2].mat, "f3");
+                    imgcodecs::imwrite_def(&get_save_filename("f3.png"), &feeds[2].mat).unwrap();
                 };
+                if ui.button(format!(
+                    "{} recording",
+                    if writer.is_none() { "start" } else { "stop" }
+                )) {
+                    if writer.is_none() {
+                        writer = Some(
+                            videoio::VideoWriter::new(
+                                &get_save_filename("out.mp4"),
+                                videoio::VideoWriter::fourcc('m', 'p', '4', 'v').unwrap(),
+                                30.,
+                                feeds[2].mat.size().unwrap(),
+                                true,
+                            )
+                            .unwrap(),
+                        );
+                    } else {
+                        writer = None;
+                    }
+                }
             });
         return Ok(());
     });
@@ -93,7 +120,7 @@ fn main() -> Result<()> {
     return Ok(());
 }
 
-fn save_pic(mat: &Mat, name: &str) {
+fn get_save_filename(name: &str) -> String {
     let mut i = 0;
     let mut filename;
 
@@ -101,10 +128,10 @@ fn save_pic(mat: &Mat, name: &str) {
         fs::create_dir(OUTPUT_FOLDER).unwrap();
     }
     while {
-        filename = format!("{}/{}-{}.png", OUTPUT_FOLDER, i, name);
+        filename = format!("{}/{}-{}", OUTPUT_FOLDER, i, name);
         fs::metadata(&filename).is_ok()
     } {
         i += 1;
     }
-    imgcodecs::imwrite_def(&filename, mat).unwrap();
+    return filename;
 }
