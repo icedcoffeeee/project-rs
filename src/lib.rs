@@ -2,9 +2,11 @@ pub mod calibrate;
 pub mod image;
 pub mod window;
 
+pub use std::fs;
+pub use std::path;
+
 pub use opencv::{core::*, prelude::*};
 pub use opencv::{imgcodecs, imgproc, videoio, Result};
-pub use std::fs;
 
 pub trait SizeToArray {
     fn to_array(self) -> [f32; 2];

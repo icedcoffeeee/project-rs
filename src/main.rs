@@ -120,18 +120,30 @@ fn main() -> Result<()> {
     return Ok(());
 }
 
-fn get_save_filename(name: &str) -> String {
+fn get_save_filepath(name: &str) -> String {
     let mut i = 0;
-    let mut filename;
+    let mut filepath = path::PathBuf::new();
 
-    if !fs::metadata(OUTPUT_FOLDER).is_ok() {
-        fs::create_dir(OUTPUT_FOLDER).unwrap();
+    filepath.push(OUTPUT_FOLDER);
+    if !filepath.exists() {
+        fs::create_dir(filepath.clone()).expect("could not create dir");
     }
-    while {
-        filename = format!("{}/{}-{}", OUTPUT_FOLDER, i, name);
-        fs::metadata(&filename).is_ok()
-    } {
-        i += 1;
+
+    for item in filepath.read_dir().expect("could not read dir") {
+        if let Some((num_str, _)) = item
+            .unwrap()
+            .file_name()
+            .into_string()
+            .unwrap()
+            .split_once("-")
+        {
+            let num: u32 = num_str.parse().expect("unexpected filename");
+            if num > i {
+                i = num;
+            };
+        };
     }
-    return filename;
+
+    filepath.push(format!("{}-{}", i + 1, name));
+    filepath.to_str().unwrap().to_string()
 }
