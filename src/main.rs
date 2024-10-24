@@ -58,6 +58,7 @@ fn main() -> Result<()> {
                     feed.make(renderer).build(ui);
                 });
         }
+
         if let Some(writer) = writer.as_mut() {
             writer.write(&feeds[2].mat)?;
         }
@@ -89,31 +90,36 @@ fn main() -> Result<()> {
                 if ui.button("reset calibration") {
                     homography = Mat::default();
                 };
-                if ui.button("save feed 1") {
-                    imgcodecs::imwrite_def(&get_save_filename("f2.png"), &feeds[1].mat).unwrap();
-                };
+
+                ui.text("save:");
+                for i in 1..=3 {
+                    ui.same_line();
+                    if ui.button(format!("feed {}", i)) {
+                        imgcodecs::imwrite_def(
+                            &get_save_filepath(&format!("f{}.png", i)),
+                            &feeds[1].mat,
+                        )
+                        .unwrap();
+                    };
+                }
+
+                ui.text("recording:");
                 ui.same_line();
-                if ui.button("save feed 3") {
-                    imgcodecs::imwrite_def(&get_save_filename("f3.png"), &feeds[2].mat).unwrap();
-                };
-                if ui.button(format!(
-                    "{} recording",
-                    if writer.is_none() { "start" } else { "stop" }
-                )) {
-                    if writer.is_none() {
+                if writer.is_none() {
+                    if ui.button("start") {
                         writer = Some(
                             videoio::VideoWriter::new(
-                                &get_save_filename("out.mp4"),
-                                videoio::VideoWriter::fourcc('m', 'p', '4', 'v').unwrap(),
-                                30.,
+                                &get_save_filepath("out.mp4"),
+                                videoio::VideoWriter::fourcc('a', 'v', 'c', '1').unwrap(),
+                                15.,
                                 feeds[2].mat.size().unwrap(),
                                 true,
                             )
                             .unwrap(),
                         );
-                    } else {
-                        writer = None;
                     }
+                } else if ui.button("stop") {
+                    writer = None;
                 }
             });
         return Ok(());
