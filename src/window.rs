@@ -2,13 +2,11 @@ use igr::glow::{self, HasContext};
 use imgui::{FontSource, Ui};
 use imgui_glow_renderer as igr;
 use imgui_sdl2_support as iss;
-
-use opencv::Result;
 use sdl2::{event::Event, video::GLProfile};
 
 pub fn begin<T>(mut app: T)
 where
-    T: FnMut(&mut igr::AutoRenderer, &mut Ui) -> Result<()>,
+    T: FnMut(&mut igr::AutoRenderer, &mut Ui),
 {
     let sdl = sdl2::init().unwrap();
     let video_subsystem = sdl.video().unwrap();
@@ -57,7 +55,7 @@ where
         platform.prepare_frame(&mut imgui, &window, &event_pump);
 
         let mut ui = imgui.new_frame();
-        app(&mut renderer, &mut ui).unwrap();
+        app(&mut renderer, &mut ui);
 
         let draw_data = imgui.render();
 

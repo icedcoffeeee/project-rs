@@ -2,17 +2,22 @@ use project::*;
 
 const OUTPUT_FOLDER: &str = "output";
 
-fn main() -> Result<()> {
+fn main() {
     let aspects = [[4, 3], [16, 9]];
     let mut base_px = 100;
     let mut aspect_idx = 0;
 
+    let cap = match env::consts::OS {
+        "linux" => videoio::CAP_V4L,
+        _ => videoio::CAP_ANY,
+    };
     let mut cameras = [
-        videoio::VideoCapture::new(0, videoio::CAP_ANY)?,
-        //videoio::VideoCapture::new(1, videoio::CAP_ANY)?,
+        videoio::VideoCapture::new(0, cap).expect("could not read camera 0"),
+        videoio::VideoCapture::new(2, cap).expect("could not read camera 1"),
     ];
     for cam in &mut cameras {
-        cam.set(videoio::CAP_PROP_FPS, 30.)?;
+        cam.set(videoio::CAP_PROP_FPS, 30.)
+            .expect("could not set fps");
     }
 
     let mut feeds = [
@@ -21,6 +26,7 @@ fn main() -> Result<()> {
         image::Image::default(),
     ];
 
+    let mut shift = [190, 30];
     //let mut homography = Mat::default();
     let mut writer: Option<videoio::VideoWriter> = None;
 
@@ -28,12 +34,22 @@ fn main() -> Result<()> {
         let aspect = aspects[aspect_idx];
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
-        //for (n, camera) in cameras.iter_mut().enumerate() {
-        //    camera.read(&mut feeds[n].mat)?;
-        //}
-        cameras[0].read(&mut feeds[0].mat)?;
-        cameras[0].read(&mut feeds[1].mat)?;
+        for (n, camera) in cameras.iter_mut().enumerate() {
+            camera
+                .read(&mut feeds[n].mat)
+                .expect(&format!("could not read from camera {}", n));
+        }
 
+        if shift.iter().any(|i| *i != 0) {
+            let size = feeds[1].mat.clone().size().unwrap();
+            imgproc::warp_affine_def(
+                &feeds[1].mat.clone(),
+                &mut feeds[1].mat,
+                &Mat::from_slice_2d(&[[1., 0., shift[0] as f32], [0., 1., -shift[1] as f32]])
+                    .unwrap(),
+                size,
+            )
+            .expect("could not warp");
         }
         //if homography.rows() > 0 {
         //    let clone = feeds[1].mat.clone();
@@ -51,14 +67,18 @@ fn main() -> Result<()> {
             let mut float2 = Mat::default();
             feeds[0].mat.convert_to_def(&mut float1, CV_32FC3).unwrap();
             feeds[1].mat.convert_to_def(&mut float2, CV_32FC3).unwrap();
-            subtract_def(&float1, &float2, &mut feeds[2].mat)?;
-            abs(&feeds[2].mat.clone())?
-                .to_mat()?
-                .convert_to_def(&mut feeds[2].mat, CV_8UC3)?;
+            subtract_def(&float1, &float2, &mut feeds[2].mat).expect("could not subtract");
+            abs(&feeds[2].mat.clone())
+                .expect("could not absolute")
+                .to_mat()
+                .expect("could not be mat")
+                .convert_to_def(&mut feeds[2].mat, CV_8UC3)
+                .expect("could not convert to u8");
         }
 
         for (n, feed) in feeds.iter_mut().enumerate() {
-            imgproc::resize_def(&feed.mat.clone(), &mut feed.mat, img_size)?;
+            imgproc::resize_def(&feed.mat.clone(), &mut feed.mat, img_size)
+                .expect("could not resize");
             ui.window(format!("Camera {}", n + 1))
                 .content_size(img_size.to_array())
                 .build(|| {
@@ -67,7 +87,10 @@ fn main() -> Result<()> {
         }
 
         if let Some(writer) = writer.as_mut() {
-            writer.write(&feeds[2].mat)?;
+            let mut rgb = Mat::default();
+            imgproc::cvt_color_def(&feeds[2].mat, &mut rgb, imgproc::COLOR_BGR2RGB)
+                .expect("could not to rgb");
+            writer.write(&rgb).expect("could not write");
         }
 
         ui.window("Control Panel")
@@ -89,6 +112,8 @@ fn main() -> Result<()> {
                     }
                 };
 
+                ui.slider("hor", 0, 400, &mut shift[0]);
+                ui.slider("ver", 0, 400, &mut shift[1]);
                 //if ui.button("calibrate") {
                 //    calibrate::get_homography(&feeds[0].mat, &feeds[1].mat, &mut homography);
                 //};
@@ -101,11 +126,11 @@ fn main() -> Result<()> {
                 for i in 1..=3 {
                     ui.same_line();
                     if ui.button(format!("feed {}", i)) {
-                        imgcodecs::imwrite_def(
-                            &get_save_filepath(&format!("f{}.png", i)),
-                            &feeds[1].mat,
-                        )
-                        .unwrap();
+                        let mut rgb = Mat::default();
+                        imgproc::cvt_color_def(&feeds[i - 1].mat, &mut rgb, imgproc::COLOR_BGR2RGB)
+                            .expect("could not to rgb");
+                        imgcodecs::imwrite_def(&get_save_filepath(&format!("f{}.png", i)), &rgb)
+                            .expect("could not save png");
                     };
                 }
 
@@ -128,10 +153,7 @@ fn main() -> Result<()> {
                     writer = None;
                 }
             });
-        return Ok(());
     });
-
-    return Ok(());
 }
 
 fn get_save_filepath(name: &str) -> String {

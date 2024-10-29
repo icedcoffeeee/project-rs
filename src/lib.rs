@@ -2,8 +2,8 @@ pub mod calibrate;
 pub mod image;
 pub mod window;
 
-pub use std::fs;
-pub use std::path;
+pub use std::{env, os};
+pub use std::{fs, path};
 
 pub use opencv::{core::*, prelude::*};
 pub use opencv::{imgcodecs, imgproc, videoio, Result};
