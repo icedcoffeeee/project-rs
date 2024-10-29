@@ -21,7 +21,7 @@ fn main() -> Result<()> {
         image::Image::default(),
     ];
 
-    let mut homography = Mat::default();
+    //let mut homography = Mat::default();
     let mut writer: Option<videoio::VideoWriter> = None;
 
     window::begin(|renderer, ui| {
@@ -34,10 +34,17 @@ fn main() -> Result<()> {
         cameras[0].read(&mut feeds[0].mat)?;
         cameras[0].read(&mut feeds[1].mat)?;
 
-        if homography.rows() > 0 {
-            let clone = feeds[1].mat.clone();
-            imgproc::warp_perspective_def(&clone, &mut feeds[1].mat, &homography, clone.size()?)?;
         }
+        //if homography.rows() > 0 {
+        //    let clone = feeds[1].mat.clone();
+        //    imgproc::warp_perspective_def(
+        //        &clone,
+        //        &mut feeds[1].mat,
+        //        &homography,
+        //        clone.size().unwrap(),
+        //    )
+        //    .expect("could not warp");
+        //}
 
         {
             let mut float1 = Mat::default();
@@ -82,14 +89,13 @@ fn main() -> Result<()> {
                     }
                 };
 
-                if ui.button("calibrate") {
-                    calibrate::get_homography(&feeds[0].mat, &feeds[1].mat, &mut homography)
-                        .unwrap();
-                };
-                ui.same_line();
-                if ui.button("reset calibration") {
-                    homography = Mat::default();
-                };
+                //if ui.button("calibrate") {
+                //    calibrate::get_homography(&feeds[0].mat, &feeds[1].mat, &mut homography);
+                //};
+                //ui.same_line();
+                //if ui.button("reset calibration") {
+                //    homography = Mat::default();
+                //};
 
                 ui.text("save:");
                 for i in 1..=3 {
