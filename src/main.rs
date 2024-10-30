@@ -7,13 +7,13 @@ fn main() {
     let mut base_px = 100;
     let mut aspect_idx = 0;
 
-    let cap = match env::consts::OS {
-        "linux" => videoio::CAP_V4L,
-        _ => videoio::CAP_ANY,
+    let [ind, cap] = match env::consts::OS {
+        "linux" => [2, videoio::CAP_V4L],
+        _ => [1, videoio::CAP_ANY],
     };
     let mut cameras = [
         videoio::VideoCapture::new(0, cap).expect("could not read camera 0"),
-        videoio::VideoCapture::new(2, cap).expect("could not read camera 1"),
+        videoio::VideoCapture::new(ind, cap).expect("could not read camera 1"),
     ];
     for cam in &mut cameras {
         cam.set(videoio::CAP_PROP_FPS, 30.)
