@@ -7,13 +7,13 @@ fn main() {
     let mut base_px = 100;
     let mut aspect_idx = 0;
 
-    let [_ind, cap] = match env::consts::OS {
+    let [ind, cap] = match env::consts::OS {
         "linux" => [2, videoio::CAP_V4L],
         _ => [1, videoio::CAP_ANY],
     };
     let mut cameras = [
         videoio::VideoCapture::new(0, cap).unwrap(),
-        //videoio::VideoCapture::new(ind, cap).unwrap(),
+        videoio::VideoCapture::new(ind, cap).unwrap(),
     ];
     for cam in &mut cameras {
         cam.set(videoio::CAP_PROP_FPS, 30.).unwrap();
@@ -33,17 +33,13 @@ fn main() {
         let aspect = aspects[aspect_idx];
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
-        //for (n, camera) in cameras.iter_mut().enumerate() {
-        //    camera
-        //        .read(&mut feeds[n].mat)
-        //        .unwrap();
-        //}
-        cameras[0].read(&mut feeds[0].mat).unwrap();
-        cameras[0].read(&mut feeds[1].mat).unwrap();
+        for (n, camera) in cameras.iter_mut().enumerate() {
+            camera.read(&mut feeds[n].mat).unwrap();
+        }
 
         if shift.iter().any(|i| *i != 0) {
             let size = feeds[1].mat.size().unwrap();
-            let m = Mat::from_slice_2d(&[[1., 0., shift[0] as f32], [0., 1., -shift[1] as f32]])
+            let m = Mat::from_slice_2d(&[[1., 0., -shift[0] as f32], [0., 1., -shift[1] as f32]])
                 .unwrap();
             imgproc::warp_affine_def(&feeds[1].mat.clone(), &mut feeds[1].mat, &m, size).unwrap();
         }
@@ -62,18 +58,15 @@ fn main() {
         .unwrap();
 
         for (n, feed) in feeds.iter_mut().enumerate() {
-            imgproc::resize_def(&feed.mat.clone(), &mut feed.mat, img_size).unwrap();
             ui.window(format!("Camera {}", n + 1))
                 .content_size(img_size.to_array())
                 .build(|| {
-                    feed.make(renderer).build(ui);
+                    feed.make(renderer, img_size).build(ui);
                 });
         }
 
         if let Some(writer) = writer.as_mut() {
-            let mut rgb = Mat::default();
-            imgproc::cvt_color_def(&feeds[2].mat, &mut rgb, imgproc::COLOR_BGR2RGB).unwrap();
-            writer.write(&rgb).unwrap();
+            writer.write(&feeds[2].mat).unwrap();
         }
 
         ui.window("Control Panel")
@@ -82,11 +75,11 @@ fn main() {
                 ui.slider("image base size", 1, 400, &mut base_px);
 
                 if ui
-                    .begin_combo("aspect ratio", format!("{:?}", aspect))
+                    .begin_combo("aspect ratio", format!("{}x{}", aspect[0], aspect[1]))
                     .is_some()
                 {
                     for (n, aspect) in aspects.iter().enumerate() {
-                        if ui.selectable(format!("{:?}", aspect)) {
+                        if ui.selectable(format!("{}x{}", aspect[0], aspect[1])) {
                             aspect_idx = n;
                         };
                         if aspect_idx == n {
@@ -99,19 +92,19 @@ fn main() {
                 ui.slider("ver", -400, 400, &mut shift[1]);
 
                 if ui.button("calibrate") {
-                    //calibrate::get_homography(&feeds[0].mat, &feeds[1].mat, &mut homo);
                     calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, &mut shift);
                 };
 
                 ui.text("save:");
-                for i in 1..=3 {
+                for n in 1..=3 {
                     ui.same_line();
-                    if ui.button(format!("feed {}", i)) {
-                        let mut rgb = Mat::default();
-                        imgproc::cvt_color_def(&feeds[i - 1].mat, &mut rgb, imgproc::COLOR_BGR2RGB)
-                            .unwrap();
-                        imgcodecs::imwrite_def(&get_save_filepath(&format!("f{}.png", i)), &rgb)
-                            .unwrap();
+                    if ui.button(format!("feed {}", n)) {
+                        println!("{:?}", feeds[n].mat.size().unwrap());
+                        imgcodecs::imwrite_def(
+                            &get_save_filepath(&format!("f{}.png", n)),
+                            &feeds[n].mat,
+                        )
+                        .unwrap();
                     };
                 }
 

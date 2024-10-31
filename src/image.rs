@@ -1,8 +1,12 @@
-use igr::glow::HasContext;
-use igr::{glow, TextureMap};
+use glow::HasContext;
+use igr::glow;
+use igr::TextureMap;
 use imgui_glow_renderer as igr;
-use opencv::core::{self as cv, MatTraitConst, MatTraitConstManual};
-use opencv::imgproc::{cvt_color_def, COLOR_BGR2RGB};
+
+use opencv::core::*;
+use opencv::imgproc;
+
+use crate::SizeToArray;
 
 /// usage:
 /// ```
@@ -14,18 +18,21 @@ use opencv::imgproc::{cvt_color_def, COLOR_BGR2RGB};
 /// ```
 #[derive(Default, Debug)]
 pub struct Image {
-    pub mat: cv::Mat,
+    pub mat: Mat,
     texture: Option<glow::Texture>,
     texture_id: Option<imgui::TextureId>,
 }
 
 impl Image {
-    pub fn make(&mut self, renderer: &mut igr::AutoRenderer) -> imgui::Image {
+    pub fn make(&mut self, renderer: &mut igr::AutoRenderer, size: Size) -> imgui::Image {
         if self.texture_id.is_none() {
             self.init(renderer)
         }
         let gl = renderer.gl_context();
-        cvt_color_def(&self.mat.clone(), &mut self.mat, COLOR_BGR2RGB).unwrap();
+
+        let mut resized = Mat::default();
+        imgproc::resize_def(&self.mat, &mut resized, size).unwrap();
+        imgproc::cvt_color_def(&resized.clone(), &mut resized, imgproc::COLOR_BGR2RGB).unwrap();
         unsafe {
             gl.bind_texture(glow::TEXTURE_2D, self.texture);
             gl.tex_parameter_i32(
@@ -42,15 +49,15 @@ impl Image {
                 glow::TEXTURE_2D,
                 0,
                 glow::RGB as _,
-                self.size()[0] as _,
-                self.size()[1] as _,
+                size.width as _,
+                size.height as _,
                 0,
                 glow::RGB,
                 glow::UNSIGNED_BYTE,
-                Some(self.mat.data_bytes().unwrap()),
+                Some(resized.data_bytes().unwrap()),
             );
         };
-        imgui::Image::new(self.texture_id.unwrap(), self.size())
+        imgui::Image::new(self.texture_id.unwrap(), size.to_array())
     }
 
     fn init(&mut self, renderer: &mut igr::AutoRenderer) {
@@ -61,12 +68,5 @@ impl Image {
                 .register(self.texture.unwrap())
                 .unwrap(),
         );
-    }
-
-    fn size(&self) -> [f32; 2] {
-        [
-            self.mat.size().unwrap().width as _,
-            self.mat.size().unwrap().height as _,
-        ]
     }
 }
