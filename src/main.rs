@@ -25,8 +25,8 @@ fn main() {
         image::Image::default(),
     ];
 
-    let homo = Mat::default();
     let mut shift = [0, 0];
+    let mut window = 100;
     let mut writer: Option<videoio::VideoWriter> = None;
 
     window::begin(|renderer, ui| {
@@ -44,18 +44,27 @@ fn main() {
             imgproc::warp_affine_def(&feeds[1].mat.clone(), &mut feeds[1].mat, &m, size).unwrap();
         }
 
-        if homo.size().unwrap().area() != 0 {
-            let size = feeds[2].mat.size().unwrap();
-            imgproc::warp_perspective_def(&feeds[2].mat.clone(), &mut feeds[2].mat, &homo, size)
-                .unwrap();
-        }
-
         absdiff(
             &feeds[0].mat.clone(),
             &feeds[1].mat.clone(),
             &mut feeds[2].mat,
         )
         .unwrap();
+
+        {
+            let size = feeds[0].mat.size().unwrap();
+            imgproc::rectangle_def(
+                &mut feeds[0].mat,
+                Rect::new(
+                    (size.width - window) / 2,
+                    (size.height - window) / 2,
+                    window,
+                    window,
+                ),
+                [1., 0., 0., 1.].into(),
+            )
+            .unwrap();
+        }
 
         for (n, feed) in feeds.iter_mut().enumerate() {
             ui.window(format!("Camera {}", n + 1))
@@ -88,20 +97,25 @@ fn main() {
                     }
                 };
 
-                ui.slider("hor", -400, 400, &mut shift[0]);
-                ui.slider("ver", -400, 400, &mut shift[1]);
-
-                if ui.button("calibrate") {
-                    calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, &mut shift);
+                ui.text("calibration:");
+                ui.slider("horizontal", -400, 400, &mut shift[0]);
+                ui.slider("vertical", -400, 400, &mut shift[1]);
+                ui.slider("window size", 1, 200, &mut window);
+                if ui.button("auto calibrate") {
+                    calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, window, &mut shift);
+                };
+                ui.same_line();
+                if ui.button("reset") {
+                    shift = [0, 0];
                 };
 
                 ui.text("save:");
-                for n in 1..=3 {
+                for n in 0..3 {
                     ui.same_line();
-                    if ui.button(format!("feed {}", n)) {
+                    if ui.button(format!("feed {}", n + 1)) {
                         println!("{:?}", feeds[n].mat.size().unwrap());
                         imgcodecs::imwrite_def(
-                            &get_save_filepath(&format!("f{}.png", n)),
+                            &get_save_filepath(&format!("f{}.png", n + 1)),
                             &feeds[n].mat,
                         )
                         .unwrap();
@@ -147,10 +161,11 @@ fn get_save_filepath(name: &str) -> String {
             .unwrap()
             .split_once("-")
         {
-            let num: u32 = num_str.parse().unwrap();
-            if num > i {
-                i = num;
-            };
+            if let Ok(num) = num_str.parse() {
+                if num > i {
+                    i = num;
+                }
+            }
         };
     }
 
