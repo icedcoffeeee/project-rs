@@ -29,12 +29,21 @@ fn main() {
     let mut window = 100;
     let mut writer: Option<videoio::VideoWriter> = None;
 
+    let mut net = dnn::read_net("input/yolov3.weights", "input/yolov3.cfg", "").unwrap();
+    let raw = fs::read("input/yolov3.txt").unwrap();
+    let classes: Vec<&str> = str::from_utf8(raw.as_slice())
+        .unwrap()
+        .split("\n")
+        .collect();
+
     window::begin(|renderer, ui| {
         let aspect = aspects[aspect_idx];
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
         for (n, camera) in cameras.iter_mut().enumerate() {
-            camera.read(&mut feeds[n].mat).unwrap();
+            if !camera.read(&mut feeds[n].mat).unwrap() {
+                return;
+            };
         }
 
         if shift.iter().any(|i| *i != 0) {
@@ -65,6 +74,8 @@ fn main() {
             )
             .unwrap();
         }
+
+        yolo::detect(&mut feeds[0].mat, &mut net, &classes);
 
         for (n, feed) in feeds.iter_mut().enumerate() {
             ui.window(format!("Camera {}", n + 1))
