@@ -29,12 +29,14 @@ fn main() {
     let mut window = 100;
     let mut writer: Option<videoio::VideoWriter> = None;
 
-    let mut net = dnn::read_net("input/yolov3.weights", "input/yolov3.cfg", "").unwrap();
-    let raw = fs::read("input/yolov3.txt").unwrap();
-    let classes: Vec<&str> = str::from_utf8(raw.as_slice())
-        .unwrap()
-        .split("\n")
-        .collect();
+    let (t_feed, r_feed) = mpsc::channel();
+    let (t_detections, r_detections) = mpsc::channel();
+    let mut detections = None;
+    let mut first_send = true;
+    thread::spawn(move || yolo::initialize_thread(r_feed, t_detections));
+
+    let classes = fs::read("yolo/yolov3.txt").unwrap();
+    let classes: Vec<&str> = str::from_utf8(&classes).unwrap().split("\n").collect();
 
     window::begin(|renderer, ui| {
         let aspect = aspects[aspect_idx];
@@ -75,7 +77,17 @@ fn main() {
             .unwrap();
         }
 
-        yolo::detect(&mut feeds[0].mat, &mut net, &classes);
+        if first_send {
+            first_send = false;
+            t_feed.send(feeds[1].mat.clone()).unwrap();
+        }
+        if let Ok(det) = r_detections.try_recv() {
+            detections = Some(det);
+            t_feed.send(feeds[1].mat.clone()).unwrap();
+        }
+        if let Some(ref detections) = detections {
+            yolo::draw_bounding_boxes(&mut feeds[2].mat, &detections, &classes);
+        }
 
         for (n, feed) in feeds.iter_mut().enumerate() {
             ui.window(format!("Camera {}", n + 1))
