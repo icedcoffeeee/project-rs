@@ -3,7 +3,7 @@ name: Rust
 on:
   push:
     branches:
-    - dual
+    - stable
 
 env:
   CARGO_TERM_COLOR: always
