@@ -38,7 +38,7 @@ fn main() {
     let classes = fs::read("yolo/yolov3.txt").unwrap();
     let classes: Vec<&str> = str::from_utf8(&classes).unwrap().split("\n").collect();
 
-    window::begin(|renderer, ui| {
+    window::create(|ui, renderer| {
         let aspect = aspects[aspect_idx];
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 

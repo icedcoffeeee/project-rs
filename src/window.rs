@@ -1,68 +1,75 @@
-use igr::glow::{self, HasContext};
-use imgui::{FontSource, Ui};
-use imgui_glow_renderer as igr;
-use imgui_sdl2_support as iss;
-use sdl2::{event::Event, video::GLProfile};
+use std::time::Instant;
 
-pub fn begin<T>(mut app: T)
-where
-    T: FnMut(&mut igr::AutoRenderer, &mut Ui),
-{
-    let sdl = sdl2::init().unwrap();
-    let video_subsystem = sdl.video().unwrap();
-    let mode = video_subsystem.current_display_mode(0).unwrap();
-    let window = video_subsystem
-        .window("app", mode.w as u32 / 4 * 3, mode.h as u32 / 4 * 3)
-        .allow_highdpi()
-        .opengl()
-        .position_centered()
-        .build()
-        .unwrap();
+use imgui::Ui;
+use imgui_glow_renderer::AutoRenderer;
+use winit::application::ApplicationHandler;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::window::WindowId;
 
-    let gl_context = window.gl_create_context().unwrap();
-    window.gl_make_current(&gl_context).unwrap();
-    window.subsystem().gl_set_swap_interval(1).unwrap();
-    window.subsystem().gl_attr().set_context_version(3, 3);
-    window
-        .subsystem()
-        .gl_attr()
-        .set_context_profile(GLProfile::Core);
+use glutin::surface::GlSurface;
+use imgui_glow_renderer::glow::{self, HasContext};
 
-    let gl_context = unsafe {
-        glow::Context::from_loader_function(|s| window.subsystem().gl_get_proc_address(s) as _)
-    };
+use crate::app::App;
 
-    let mut imgui = imgui::Context::create();
-    //imgui.set_ini_filename(None);
-    imgui.set_log_filename(None);
-    imgui
-        .fonts()
-        .add_font(&[FontSource::DefaultFontData { config: None }]);
-    imgui.style_mut().use_dark_colors();
+impl<Loop: FnMut(&mut Ui, &mut AutoRenderer)> ApplicationHandler for App<Loop> {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        self.setup(event_loop);
+    }
 
-    let mut event_pump = sdl.event_pump().unwrap();
-    let mut platform = iss::SdlPlatform::new(&mut imgui);
-    let mut renderer = igr::AutoRenderer::new(gl_context, &mut imgui).unwrap();
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
+        let now = Instant::now();
+        self.imgui.io_mut().update_delta_time(now - self.last_frame);
+        self.last_frame = now;
+    }
 
-    'main: loop {
-        for event in event_pump.poll_iter() {
-            platform.handle_event(&mut imgui, &event);
-            if let Event::Quit { .. } = event {
-                break 'main;
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        self.platform
+            .prepare_frame(self.imgui.io_mut(), self.window.as_ref().unwrap())
+            .expect("could not prepare frame");
+        self.window.as_ref().unwrap().request_redraw();
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::RedrawRequested => {
+                let renderer = self.renderer.as_mut().unwrap();
+                let ui = self.imgui.new_frame();
+                self.platform
+                    .prepare_render(ui, self.window.as_ref().unwrap());
+
+                (self.main_loop)(ui, renderer);
+
+                unsafe {
+                    renderer.gl_context().clear(glow::COLOR_BUFFER_BIT);
+                }
+
+                let draw_data = self.imgui.render();
+                if draw_data.draw_lists_count() != 0 {
+                    renderer.render(draw_data).unwrap();
+                }
+
+                let (surface, context) = self.surface.as_ref().unwrap();
+                surface.swap_buffers(&context).unwrap();
+            }
+            WindowEvent::CloseRequested => event_loop.exit(),
+            _ => {
+                self.platform.handle_event(
+                    self.imgui.io_mut(),
+                    self.window.as_ref().unwrap(),
+                    &Event::<()>::WindowEvent { window_id, event },
+                );
             }
         }
-
-        platform.prepare_frame(&mut imgui, &window, &event_pump);
-
-        let mut ui = imgui.new_frame();
-        app(&mut renderer, &mut ui);
-
-        let draw_data = imgui.render();
-
-        unsafe {
-            renderer.gl_context().clear(glow::COLOR_BUFFER_BIT);
-        }
-        renderer.render(draw_data).unwrap();
-        window.gl_swap_window();
     }
+}
+pub fn create<Loop: FnMut(&mut Ui, &mut AutoRenderer)>(main_loop: Loop) {
+    let event_loop = EventLoop::new().unwrap();
+    let mut app = App::new(main_loop);
+    event_loop.run_app(&mut app).expect("could not run app");
 }
