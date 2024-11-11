@@ -1,6 +1,8 @@
 use project::*;
 
 const OUTPUT_FOLDER: &str = "output";
+const DETECTION: bool = true;
+const DUAL_CAMERA: bool = true;
 
 fn main() {
     let aspects = [[4, 3], [16, 9]];
@@ -11,12 +13,24 @@ fn main() {
         "linux" => [2, videoio::CAP_V4L],
         _ => [1, videoio::CAP_ANY],
     };
-    let mut cameras = [
-        videoio::VideoCapture::new(0, cap).unwrap(),
-        videoio::VideoCapture::new(ind, cap).unwrap(),
-    ];
+    let mut cameras = if DUAL_CAMERA {
+        [
+            videoio::VideoCapture::new(0, cap).unwrap(),
+            videoio::VideoCapture::new(ind, cap).unwrap(),
+        ]
+    } else {
+        [
+            videoio::VideoCapture::new(0, cap).unwrap(),
+            videoio::VideoCapture::default().unwrap(),
+        ]
+    };
     for cam in &mut cameras {
         cam.set(videoio::CAP_PROP_FPS, 30.).unwrap();
+        cam.set(
+            videoio::CAP_PROP_FOURCC,
+            videoio::VideoWriter::fourcc('m', 'j', 'p', 'g').unwrap() as _,
+        )
+        .unwrap();
     }
 
     let mut feeds = [
@@ -33,19 +47,28 @@ fn main() {
     let (t_detections, r_detections) = mpsc::channel();
     let mut detections = None;
     let mut first_send = true;
-    thread::spawn(move || yolo::initialize_thread(r_feed, t_detections));
+    if DETECTION {
+        thread::spawn(move || detection::initialize_thread(r_feed, t_detections));
+    }
 
-    let classes = fs::read("yolo/yolov3.txt").unwrap();
-    let classes: Vec<&str> = str::from_utf8(&classes).unwrap().split("\n").collect();
+    let mut classes: Option<Vec<String>> = None;
 
-    window::begin(|renderer, ui| {
+    window::create(|ui, renderer| {
         let aspect = aspects[aspect_idx];
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
-        for (n, camera) in cameras.iter_mut().enumerate() {
-            if !camera.read(&mut feeds[n].mat).unwrap() {
-                return;
-            };
+        if DUAL_CAMERA {
+            for n in 0..cameras.len() {
+                if !cameras[n].read(&mut feeds[n].mat).unwrap() {
+                    return;
+                }
+            }
+        } else {
+            for n in 0..cameras.len() {
+                if !cameras[0].read(&mut feeds[n].mat).unwrap() {
+                    return;
+                }
+            }
         }
 
         if shift.iter().any(|i| *i != 0) {
@@ -77,16 +100,18 @@ fn main() {
             .unwrap();
         }
 
-        if first_send {
-            first_send = false;
-            t_feed.send(feeds[1].mat.clone()).unwrap();
-        }
-        if let Ok(det) = r_detections.try_recv() {
-            detections = Some(det);
-            t_feed.send(feeds[1].mat.clone()).unwrap();
-        }
-        if let Some(ref detections) = detections {
-            yolo::draw_bounding_boxes(&mut feeds[2].mat, &detections, &classes);
+        if DETECTION {
+            if first_send {
+                first_send = false;
+                t_feed.send(feeds[1].mat.clone()).unwrap();
+            }
+            if let Ok(det) = r_detections.try_recv() {
+                detections = Some(det);
+                t_feed.send(feeds[1].mat.clone()).unwrap();
+            }
+            if let Some(ref detections) = detections {
+                detection::draw_bounding_boxes(&mut feeds[2].mat, &detections, &mut classes);
+            }
         }
 
         for (n, feed) in feeds.iter_mut().enumerate() {
