@@ -26,6 +26,11 @@ fn main() {
     };
     for cam in &mut cameras {
         cam.set(videoio::CAP_PROP_FPS, 30.).unwrap();
+        cam.set(
+            videoio::CAP_PROP_FOURCC,
+            videoio::VideoWriter::fourcc('m', 'j', 'p', 'g').unwrap() as _,
+        )
+        .unwrap();
     }
 
     let mut feeds = [
@@ -53,14 +58,14 @@ fn main() {
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
         if DUAL_CAMERA {
-            for (n, feed) in feeds.iter_mut().enumerate() {
-                if !cameras[n].read(&mut feed.mat).unwrap() {
+            for n in 0..cameras.len() {
+                if !cameras[n].read(&mut feeds[n].mat).unwrap() {
                     return;
-                };
+                }
             }
         } else {
-            for feed in feeds.iter_mut() {
-                if !cameras[0].read(&mut feed.mat).unwrap() {
+            for n in 0..cameras.len() {
+                if !cameras[0].read(&mut feeds[n].mat).unwrap() {
                     return;
                 }
             }
