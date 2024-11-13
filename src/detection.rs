@@ -25,8 +25,8 @@ pub fn initialize_thread(r_feed: Receiver<Mat>, t_detections: Sender<Detections>
         }
         let mut detections = Detections::default();
         let (ref mut class_ids, ref mut scores, ref mut rects) = &mut detections;
-        model.detect_def(&feed, class_ids, scores, rects).unwrap();
-        t_detections.send(detections).unwrap();
+        let _ = model.detect_def(&feed, class_ids, scores, rects);
+        let _ = t_detections.send(detections);
     }
 }
 

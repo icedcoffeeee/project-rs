@@ -85,6 +85,20 @@ fn main() {
         )
         .unwrap();
 
+        if DETECTION {
+            if first_send {
+                first_send = false;
+                let _ = t_feed.send(feeds[0].mat.clone());
+            }
+            if let Ok(det) = r_detections.try_recv() {
+                detections = Some(det);
+                let _ = t_feed.send(feeds[0].mat.clone());
+            }
+            if let Some(ref detections) = detections {
+                detection::draw_bounding_boxes(&mut feeds[2].mat, &detections, &mut classes);
+            }
+        }
+
         {
             let size = feeds[0].mat.size().unwrap();
             imgproc::rectangle_def(
@@ -98,20 +112,6 @@ fn main() {
                 [1., 0., 0., 1.].into(),
             )
             .unwrap();
-        }
-
-        if DETECTION {
-            if first_send {
-                first_send = false;
-                t_feed.send(feeds[1].mat.clone()).unwrap();
-            }
-            if let Ok(det) = r_detections.try_recv() {
-                detections = Some(det);
-                t_feed.send(feeds[1].mat.clone()).unwrap();
-            }
-            if let Some(ref detections) = detections {
-                detection::draw_bounding_boxes(&mut feeds[2].mat, &detections, &mut classes);
-            }
         }
 
         for (n, feed) in feeds.iter_mut().enumerate() {
@@ -136,9 +136,13 @@ fn main() {
                     .is_some()
                 {
                     for (n, aspect) in aspects.iter().enumerate() {
-                        if ui.selectable(format!("{}x{}", aspect[0], aspect[1])) {
+                        if ui
+                            .selectable_config(format!("{}x{}", aspect[0], aspect[1]))
+                            .selected(aspect_idx == n)
+                            .build()
+                        {
                             aspect_idx = n;
-                        };
+                        }
                         if aspect_idx == n {
                             ui.set_item_default_focus();
                         }
