@@ -52,6 +52,7 @@ fn main() {
     }
 
     let mut classes: Option<Vec<String>> = None;
+    let mut colors = [[0.; 90]; 3];
 
     window::create(|ui, renderer| {
         let aspect = aspects[aspect_idx];
@@ -191,6 +192,19 @@ fn main() {
                     }
                 } else if ui.button("stop") {
                     writer = None;
+                }
+
+                let mut rgb = Vector::<Mat>::new();
+                split(&feeds[2].mat, &mut rgb).unwrap();
+                for (n, (c, l)) in colors.iter_mut().zip(rgb).enumerate() {
+                    (*c).rotate_left(1);
+                    (*c)[c.len() - 1] = *mean_def(&l).unwrap().get(n).unwrap();
+                }
+
+                for (c, l) in colors.into_iter().zip(["R", "G", "B"]) {
+                    let _ = ui.plot_lines(l, c.map(|x| x as f32).as_slice());
+                    ui.same_line();
+                    ui.text(format!("{}", c[c.len() - 1]));
                 }
             });
     });
