@@ -7,7 +7,7 @@ const DUAL_CAMERA: bool = true;
 fn main() {
     let aspects = [[4, 3], [16, 9]];
     let mut base_px = 100;
-    let mut aspect_idx = 0;
+    let mut aspect = &aspects[0];
 
     let [ind, cap] = match env::consts::OS {
         "linux" => [2, videoio::CAP_V4L],
@@ -55,7 +55,6 @@ fn main() {
     let mut colors = [[0.; 90]; 3];
 
     window::create(|ui, renderer| {
-        let aspect = aspects[aspect_idx];
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
         if DUAL_CAMERA {
@@ -126,20 +125,19 @@ fn main() {
             .build(|| {
                 ui.slider("image base size", 1, 400, &mut base_px);
 
-                if ui
-                    .begin_combo("aspect ratio", format!("{}x{}", aspect[0], aspect[1]))
-                    .is_some()
+                if let Some(_) =
+                    ui.begin_combo("aspect ratio", format!("{}x{}", aspect[0], aspect[1]))
                 {
-                    for (n, aspect) in aspects.iter().enumerate() {
+                    for a in &aspects {
+                        if aspect == a {
+                            ui.set_item_default_focus();
+                        }
                         if ui
-                            .selectable_config(format!("{}x{}", aspect[0], aspect[1]))
-                            .selected(aspect_idx == n)
+                            .selectable_config(format!("{}x{}", a[0], a[1]))
+                            .selected(aspect == a)
                             .build()
                         {
-                            aspect_idx = n;
-                        }
-                        if aspect_idx == n {
-                            ui.set_item_default_focus();
+                            aspect = a;
                         }
                     }
                 };
