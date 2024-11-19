@@ -100,20 +100,14 @@ fn main() {
             }
         }
 
-        {
-            let size = feeds[0].mat.size().unwrap();
-            imgproc::rectangle_def(
-                &mut feeds[0].mat,
-                Rect::new(
-                    (size.width - window) / 2,
-                    (size.height - window) / 2,
-                    window,
-                    window,
-                ),
-                [1., 0., 0., 1.].into(),
-            )
-            .unwrap();
-        }
+        let size = feeds[0].mat.size().unwrap();
+        let mini = Rect::new(
+            (size.width - window) / 2,
+            (size.height - window) / 2,
+            window,
+            window,
+        );
+        imgproc::rectangle_def(&mut feeds[0].mat, mini, [1., 0., 0., 1.].into()).unwrap();
 
         for (n, feed) in feeds.iter_mut().enumerate() {
             ui.window(format!("Camera {}", n + 1))
@@ -195,16 +189,19 @@ fn main() {
                 }
 
                 let mut rgb = Vector::<Mat>::new();
-                split(&feeds[2].mat, &mut rgb).unwrap();
-                for (n, (c, l)) in colors.iter_mut().zip(rgb).enumerate() {
+                split(&feeds[2].mat.roi(mini).unwrap(), &mut rgb).unwrap();
+                for (c, l) in colors.iter_mut().zip(rgb) {
                     (*c).rotate_left(1);
-                    (*c)[c.len() - 1] = *mean_def(&l).unwrap().get(n).unwrap();
+                    (*c)[c.len() - 1] = mean_def(&l).unwrap()[0];
                 }
 
-                for (c, l) in colors.into_iter().zip(["R", "G", "B"]) {
-                    let _ = ui.plot_lines(l, c.map(|x| x as f32).as_slice());
+                for (c, l) in colors.into_iter().zip(["B", "G", "R"]) {
+                    ui.plot_lines(l, c.map(|x| x as f32).as_slice())
+                        .scale_min(0.)
+                        .scale_max(20.)
+                        .build();
                     ui.same_line();
-                    ui.text(format!("{}", c[c.len() - 1]));
+                    ui.text(format!("{:.2}", c[c.len() - 1]));
                 }
             });
     });
