@@ -1,3 +1,4 @@
+use imgui::TableColumnSetup;
 use project::*;
 
 const OUTPUT_FOLDER: &str = "output";
@@ -25,13 +26,15 @@ fn main() {
         ]
     };
     for cam in &mut cameras {
-        cam.set(videoio::CAP_PROP_FPS, 30.).unwrap();
         cam.set(
             videoio::CAP_PROP_FOURCC,
             videoio::VideoWriter::fourcc('m', 'j', 'p', 'g').unwrap() as _,
         )
         .unwrap();
     }
+    cameras[0]
+        .set(videoio::CAP_PROP_WB_TEMPERATURE, 4600.)
+        .unwrap();
 
     let mut feeds = [
         image::Image::default(),
@@ -52,9 +55,16 @@ fn main() {
     }
 
     let mut classes: Option<Vec<String>> = None;
-    let mut colors = [[0.; 90]; 3];
+    let mut shift_a = [0, 0];
+    let mut init = true;
 
     window::create(|ui, renderer| {
+        if init && !feeds[0].mat.empty() {
+            init = false;
+            calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, window, &mut shift);
+            window = 40;
+            shift_a[0] = -85;
+        }
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
         if DUAL_CAMERA {
@@ -99,14 +109,24 @@ fn main() {
             }
         }
 
-        let size = feeds[0].mat.size().unwrap();
-        let mini = Rect::new(
-            (size.width - window) / 2,
-            (size.height - window) / 2,
+        let size_b = feeds[0].mat.size().unwrap();
+        let mini_b = Rect::new(
+            (size_b.width - window) / 2,
+            (size_b.height - window) / 2,
             window,
             window,
         );
-        imgproc::rectangle_def(&mut feeds[0].mat, mini, [1., 0., 0., 1.].into()).unwrap();
+        let size_a = feeds[0].mat.size().unwrap();
+        let mini_a = Rect::new(
+            (size_a.width - window) / 2 + shift_a[0],
+            (size_a.height - window) / 2 + shift_a[1],
+            window,
+            window,
+        );
+        for feed in &mut feeds{
+            imgproc::rectangle_def(&mut feed.mat, mini_a, [0., 0., 0., 255.].into()).unwrap();
+            imgproc::rectangle_def(&mut feed.mat, mini_b, [0., 0., 0., 255.].into()).unwrap();
+        }
 
         for (n, feed) in feeds.iter_mut().enumerate() {
             ui.window(format!("Camera {}", n + 1))
@@ -143,8 +163,10 @@ fn main() {
                 };
 
                 ui.text("calibration:");
-                ui.slider("horizontal", -400, 400, &mut shift[0]);
-                ui.slider("vertical", -400, 400, &mut shift[1]);
+                ui.slider("horizontal_a", -400, 400, &mut shift_a[0]);
+                ui.slider("vertical_a", -400, 400, &mut shift_a[1]);
+                ui.slider("horizontal_b", -400, 400, &mut shift[0]);
+                ui.slider("vertical_b", -400, 400, &mut shift[1]);
                 ui.slider("window size", 1, 200, &mut window);
                 if ui.button("auto calibrate") {
                     calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, window, &mut shift);
@@ -186,20 +208,32 @@ fn main() {
                     writer = None;
                 }
 
-                let mut rgb = Vector::<Mat>::new();
-                split(&feeds[2].mat.roi(mini).unwrap(), &mut rgb).unwrap();
-                for (c, l) in colors.iter_mut().zip(rgb) {
-                    (*c).rotate_left(1);
-                    (*c)[c.len() - 1] = mean_def(&l).unwrap()[0];
-                }
-
-                for (c, l) in colors.into_iter().zip(["B", "G", "R"]) {
-                    ui.plot_lines(l, c.map(|x| x as f32).as_slice())
-                        .scale_min(0.)
-                        .scale_max(20.)
-                        .build();
-                    ui.same_line();
-                    ui.text(format!("{:.2}", c[c.len() - 1]));
+                for (a, mini) in [mini_a, mini_b].into_iter().enumerate() {
+                    ui.new_line();
+                    ui.text(["alive", "dead"][a]);
+                    if let Some(_) = ui.begin_table_header(
+                        "channel readings",
+                        [
+                            TableColumnSetup::new("feeds"),
+                            TableColumnSetup::new("red"),
+                            TableColumnSetup::new("green"),
+                            TableColumnSetup::new("blue"),
+                        ],
+                    ) {
+                        for (n, feed) in feeds.iter().enumerate() {
+                            let mut bgr = Vector::<Mat>::new();
+                            split(&feed.mat.roi(mini).unwrap(), &mut bgr).unwrap();
+                            ui.table_next_column();
+                            ui.text(format!("camera {}", n + 1));
+                            for i in 0..3 {
+                                ui.table_next_column();
+                                ui.text(format!(
+                                    "{:.2}",
+                                    mean_def(&bgr.get(2 - i).unwrap()).unwrap()[0]
+                                ));
+                            }
+                        }
+                    }
                 }
             });
     });
