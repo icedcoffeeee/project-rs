@@ -32,7 +32,11 @@ impl<Loop: FnMut(&mut Ui, &mut AutoRenderer)> App<Loop> {
     pub fn new(main_loop: Loop) -> Self {
         let mut imgui = Context::create();
         let font_atlas = imgui.fonts();
-        font_atlas.add_font(&[FontSource::DefaultFontData { config: None }]);
+        font_atlas.add_font(&[FontSource::TtfData {
+            data: include_bytes!("../assets/JetBrainsMonoNerdFont-Regular.ttf"),
+            size_pixels: 16.,
+            config: None,
+        }]);
         font_atlas.build_rgba32_texture();
 
         let platform = WinitPlatform::new(&mut imgui);
@@ -51,7 +55,9 @@ impl<Loop: FnMut(&mut Ui, &mut AutoRenderer)> App<Loop> {
 
     pub fn setup(&mut self, event_loop: &ActiveEventLoop) {
         let size = PhysicalSize::new(1920 * 3 / 4, 1080 * 3 / 4);
-        let wind_attr = WindowAttributes::default().with_inner_size(size);
+        let wind_attr = WindowAttributes::default()
+            .with_title("project")
+            .with_inner_size(size);
         let template = ConfigTemplateBuilder::new();
         let compare_conf = |a: &Config, b: &Config| a.num_samples().cmp(&b.num_samples());
 

@@ -163,10 +163,10 @@ fn main() {
                 };
 
                 ui.text("calibration:");
-                ui.slider("horizontal_a", -400, 400, &mut shift_a[0]);
-                ui.slider("vertical_a", -400, 400, &mut shift_a[1]);
-                ui.slider("horizontal_b", -400, 400, &mut shift[0]);
-                ui.slider("vertical_b", -400, 400, &mut shift[1]);
+                ui.slider("horizontal a", -400, 400, &mut shift_a[0]);
+                ui.slider("vertical a", -400, 400, &mut shift_a[1]);
+                ui.slider("horizontal b", -400, 400, &mut shift[0]);
+                ui.slider("vertical b", -400, 400, &mut shift[1]);
                 ui.slider("window size", 1, 200, &mut window);
                 if ui.button("auto calibrate") {
                     calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, window, &mut shift);
