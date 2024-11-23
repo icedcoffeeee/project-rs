@@ -56,15 +56,15 @@ fn main() {
 
     let mut classes: Option<Vec<String>> = None;
     let mut shift_a = [0, 0];
-    let mut init = true;
+    //let mut init = true;
 
     window::create(|ui, renderer| {
-        if init && !feeds[0].mat.empty() {
-            init = false;
-            calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, window, &mut shift);
-            window = 40;
-            shift_a[0] = -85;
-        }
+        //if init && !feeds[0].mat.empty() {
+        //    init = false;
+        //    calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, window, &mut shift);
+        //    window = 40;
+        //    shift_a[0] = -85;
+        //}
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
         if DUAL_CAMERA {
