@@ -1,9 +1,7 @@
-use imgui::TableColumnSetup;
 use project::*;
 
-const OUTPUT_FOLDER: &str = "output";
-const DETECTION: bool = true;
-const DUAL_CAMERA: bool = true;
+const DETECTION: bool = false;
+const DUAL_CAMERA: bool = false;
 
 fn main() {
     let aspects = [[4, 3], [16, 9]];
@@ -56,15 +54,8 @@ fn main() {
 
     let mut classes: Option<Vec<String>> = None;
     let mut shift_a = [0, 0];
-    //let mut init = true;
 
     window::create(|ui, renderer| {
-        //if init && !feeds[0].mat.empty() {
-        //    init = false;
-        //    calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, window, &mut shift);
-        //    window = 40;
-        //    shift_a[0] = -85;
-        //}
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
         if DUAL_CAMERA {
@@ -123,7 +114,7 @@ fn main() {
             window,
             window,
         );
-        for feed in &mut feeds{
+        for feed in &mut feeds {
             imgproc::rectangle_def(&mut feed.mat, mini_a, [0., 0., 0., 255.].into()).unwrap();
             imgproc::rectangle_def(&mut feed.mat, mini_b, [0., 0., 0., 255.].into()).unwrap();
         }
@@ -163,10 +154,8 @@ fn main() {
                 };
 
                 ui.text("calibration:");
-                ui.slider("horizontal a", -400, 400, &mut shift_a[0]);
-                ui.slider("vertical a", -400, 400, &mut shift_a[1]);
-                ui.slider("horizontal b", -400, 400, &mut shift[0]);
-                ui.slider("vertical b", -400, 400, &mut shift[1]);
+                ui.slider("camera 2 shift x", -400, 400, &mut shift[0]);
+                ui.slider("camera 2 shift y", -400, 400, &mut shift[1]);
                 ui.slider("window size", 1, 200, &mut window);
                 if ui.button("auto calibrate") {
                     calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, window, &mut shift);
@@ -182,7 +171,7 @@ fn main() {
                     if ui.button(format!("feed {}", n + 1)) {
                         println!("{:?}", feeds[n].mat.size().unwrap());
                         imgcodecs::imwrite_def(
-                            &get_save_filepath(&format!("f{}.png", n + 1)),
+                            &utils::get_save_filepath(&format!("f{}.png", n + 1)),
                             &feeds[n].mat,
                         )
                         .unwrap();
@@ -195,7 +184,7 @@ fn main() {
                     if ui.button("start") {
                         writer = Some(
                             videoio::VideoWriter::new(
-                                &get_save_filepath("out.mp4"),
+                                &utils::get_save_filepath("out.mp4"),
                                 videoio::VideoWriter::fourcc('a', 'v', 'c', '1').unwrap(),
                                 15.,
                                 feeds[2].mat.size().unwrap(),
@@ -208,17 +197,14 @@ fn main() {
                     writer = None;
                 }
 
+                ui.slider("left window x", -400, 400, &mut shift_a[0]);
+                ui.slider("left window y", -400, 400, &mut shift_a[1]);
                 for (a, mini) in [mini_a, mini_b].into_iter().enumerate() {
                     ui.new_line();
-                    ui.text(["alive", "dead"][a]);
+                    ui.text(["left", "center"][a]);
                     if let Some(_) = ui.begin_table_header(
                         "channel readings",
-                        [
-                            TableColumnSetup::new("feeds"),
-                            TableColumnSetup::new("red"),
-                            TableColumnSetup::new("green"),
-                            TableColumnSetup::new("blue"),
-                        ],
+                        ["feeds", "red", "green", "blue"].map(|h| im::TableColumnSetup::new(h)),
                     ) {
                         for (n, feed) in feeds.iter().enumerate() {
                             let mut bgr = Vector::<Mat>::new();
@@ -237,33 +223,4 @@ fn main() {
                 }
             });
     });
-}
-
-fn get_save_filepath(name: &str) -> String {
-    let mut i = 0;
-    let mut filepath = path::PathBuf::new();
-
-    filepath.push(OUTPUT_FOLDER);
-    if !filepath.exists() {
-        fs::create_dir(filepath.clone()).unwrap();
-    }
-
-    for item in filepath.read_dir().unwrap() {
-        if let Some((num_str, _)) = item
-            .unwrap()
-            .file_name()
-            .into_string()
-            .unwrap()
-            .split_once("-")
-        {
-            if let Ok(num) = num_str.parse() {
-                if num > i {
-                    i = num;
-                }
-            }
-        };
-    }
-
-    filepath.push(format!("{}-{}", i + 1, name));
-    filepath.to_str().unwrap().to_string()
 }

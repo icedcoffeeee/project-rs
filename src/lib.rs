@@ -1,9 +1,11 @@
 pub mod app;
 pub mod calibrate;
-pub mod image;
-pub mod window;
 pub mod detection;
+pub mod image;
+pub mod utils;
+pub mod window;
 
+pub use imgui as im;
 pub use std::{env, os, str};
 pub use std::{fs, path};
 pub use std::{sync::mpsc, thread};
