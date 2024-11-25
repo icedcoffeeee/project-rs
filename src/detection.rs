@@ -53,7 +53,7 @@ pub fn draw_bounding_boxes(
     for i in indices {
         let rect: Rect = rects.to_vec()[i as usize];
         let label = classes[class_ids.to_vec()[i as usize] as usize].as_str();
-        let color: VecN<f64, 4> = [0., 0., 255., 255.].into();
+        let color: Scalar = [0., 0., 255., 255.].into();
         imgproc::rectangle_def(mat, rect, color).unwrap();
 
         let text_org = Point::new(rect.x + 10, rect.y + 20);

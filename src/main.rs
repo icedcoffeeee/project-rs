@@ -1,11 +1,11 @@
 use project::*;
 
-const DETECTION: bool = false;
-const DUAL_CAMERA: bool = false;
+const DETECTION: bool = true;
+const DUAL_CAMERA: bool = true;
 
 fn main() {
     let aspects = [[4, 3], [16, 9]];
-    let mut base_px = 100;
+    let mut base_px = 60;
     let mut aspect = &aspects[0];
 
     let [ind, cap] = match env::consts::OS {
@@ -23,16 +23,10 @@ fn main() {
             videoio::VideoCapture::default().unwrap(),
         ]
     };
+    let mjpg = videoio::VideoWriter::fourcc('m', 'j', 'p', 'g').unwrap() as f64;
     for cam in &mut cameras {
-        cam.set(
-            videoio::CAP_PROP_FOURCC,
-            videoio::VideoWriter::fourcc('m', 'j', 'p', 'g').unwrap() as _,
-        )
-        .unwrap();
+        cam.set(videoio::CAP_PROP_FOURCC, mjpg).unwrap();
     }
-    cameras[0]
-        .set(videoio::CAP_PROP_WB_TEMPERATURE, 4600.)
-        .unwrap();
 
     let mut feeds = [
         image::Image::default(),
@@ -40,42 +34,39 @@ fn main() {
         image::Image::default(),
     ];
 
-    let mut shift = [0, 0];
-    let mut window = 100;
+    let mut shift_camera_2 = [0, 0];
+    let mut shift_left_window = [0, 0];
+    let mut window_size = 100;
     let mut writer: Option<videoio::VideoWriter> = None;
 
     let (t_feed, r_feed) = mpsc::channel();
     let (t_detections, r_detections) = mpsc::channel();
     let mut detections = None;
     let mut first_send = true;
+    let mut classes: Option<Vec<String>> = None;
     if DETECTION {
         thread::spawn(move || detection::initialize_thread(r_feed, t_detections));
     }
 
-    let mut classes: Option<Vec<String>> = None;
-    let mut shift_a = [0, 0];
-
     window::create(|ui, renderer| {
         let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
 
-        if DUAL_CAMERA {
-            for n in 0..cameras.len() {
-                if !cameras[n].read(&mut feeds[n].mat).unwrap() {
-                    return;
-                }
-            }
-        } else {
-            for n in 0..cameras.len() {
-                if !cameras[0].read(&mut feeds[n].mat).unwrap() {
-                    return;
-                }
+        for n in 0..cameras.len() {
+            if !cameras[[0, n][DUAL_CAMERA as usize]]
+                .read(&mut feeds[n].mat)
+                .unwrap()
+            {
+                return;
             }
         }
 
-        if shift.iter().any(|i| *i != 0) {
+        if shift_camera_2.iter().any(|i| *i != 0) {
             let size = feeds[1].mat.size().unwrap();
-            let m = Mat::from_slice_2d(&[[1., 0., -shift[0] as f32], [0., 1., -shift[1] as f32]])
-                .unwrap();
+            let m = Mat::from_slice_2d(&[
+                [1., 0., -shift_camera_2[0] as f32],
+                [0., 1., -shift_camera_2[1] as f32],
+            ])
+            .unwrap();
             imgproc::warp_affine_def(&feeds[1].mat.clone(), &mut feeds[1].mat, &m, size).unwrap();
         }
 
@@ -83,6 +74,14 @@ fn main() {
             &feeds[0].mat.clone(),
             &feeds[1].mat.clone(),
             &mut feeds[2].mat,
+        )
+        .unwrap();
+        imgproc::threshold(
+            &feeds[2].mat.clone(),
+            &mut feeds[2].mat,
+            10.,
+            255.,
+            imgproc::THRESH_TOZERO,
         )
         .unwrap();
 
@@ -100,27 +99,26 @@ fn main() {
             }
         }
 
-        let size_b = feeds[0].mat.size().unwrap();
-        let mini_b = Rect::new(
-            (size_b.width - window) / 2,
-            (size_b.height - window) / 2,
-            window,
-            window,
+        let size = feeds[0].mat.size().unwrap();
+        let mini_center = Rect::new(
+            (size.width - window_size) / 2,
+            (size.height - window_size) / 2,
+            window_size,
+            window_size,
         );
-        let size_a = feeds[0].mat.size().unwrap();
-        let mini_a = Rect::new(
-            (size_a.width - window) / 2 + shift_a[0],
-            (size_a.height - window) / 2 + shift_a[1],
-            window,
-            window,
+        let mini_left = Rect::new(
+            (size.width - window_size) / 2 + shift_left_window[0],
+            (size.height - window_size) / 2 + shift_left_window[1],
+            window_size,
+            window_size,
         );
         for feed in &mut feeds {
-            imgproc::rectangle_def(&mut feed.mat, mini_a, [0., 0., 0., 255.].into()).unwrap();
-            imgproc::rectangle_def(&mut feed.mat, mini_b, [0., 0., 0., 255.].into()).unwrap();
+            imgproc::rectangle_def(&mut feed.mat, mini_left, [0., 0., 0., 255.].into()).unwrap();
+            imgproc::rectangle_def(&mut feed.mat, mini_center, [0., 0., 0., 255.].into()).unwrap();
         }
 
         for (n, feed) in feeds.iter_mut().enumerate() {
-            ui.window(format!("Camera {}", n + 1))
+            ui.window(["left", "right", "subtracted"][n])
                 .content_size(img_size.to_array())
                 .build(|| {
                     feed.make(renderer, img_size).build(ui);
@@ -154,15 +152,20 @@ fn main() {
                 };
 
                 ui.text("calibration:");
-                ui.slider("camera 2 shift x", -400, 400, &mut shift[0]);
-                ui.slider("camera 2 shift y", -400, 400, &mut shift[1]);
-                ui.slider("window size", 1, 200, &mut window);
+                ui.slider("camera 2 shift x", -400, 400, &mut shift_camera_2[0]);
+                ui.slider("camera 2 shift y", -400, 400, &mut shift_camera_2[1]);
+                ui.slider("window size", 1, 200, &mut window_size);
                 if ui.button("auto calibrate") {
-                    calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, window, &mut shift);
+                    calibrate::get_shift(
+                        &feeds[0].mat,
+                        &feeds[1].mat,
+                        window_size,
+                        &mut shift_camera_2,
+                    );
                 };
                 ui.same_line();
                 if ui.button("reset") {
-                    shift = [0, 0];
+                    shift_camera_2 = [0, 0];
                 };
 
                 ui.text("save:");
@@ -197,9 +200,9 @@ fn main() {
                     writer = None;
                 }
 
-                ui.slider("left window x", -400, 400, &mut shift_a[0]);
-                ui.slider("left window y", -400, 400, &mut shift_a[1]);
-                for (a, mini) in [mini_a, mini_b].into_iter().enumerate() {
+                ui.slider("left window x", -400, 400, &mut shift_left_window[0]);
+                ui.slider("left window y", -400, 400, &mut shift_left_window[1]);
+                for (a, mini) in [mini_left, mini_center].into_iter().enumerate() {
                     ui.new_line();
                     ui.text(["left", "center"][a]);
                     if let Some(_) = ui.begin_table_header(
