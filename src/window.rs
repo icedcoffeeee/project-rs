@@ -1,3 +1,4 @@
+use opencv::Result;
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -14,7 +15,7 @@ use winit::window::WindowId;
 
 use crate::*;
 
-impl<Loop: FnMut(&mut Ui, &mut AutoRenderer)> ApplicationHandler for app::App<Loop> {
+impl<Loop: FnMut(&mut Ui, &mut AutoRenderer) -> Result<()>> ApplicationHandler for app::App<Loop> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.setup(event_loop);
     }
@@ -45,7 +46,7 @@ impl<Loop: FnMut(&mut Ui, &mut AutoRenderer)> ApplicationHandler for app::App<Lo
                 self.platform
                     .prepare_render(ui, self.window.as_ref().unwrap());
 
-                (self.main_loop)(ui, renderer);
+                (self.main_loop)(ui, renderer).unwrap();
 
                 unsafe {
                     renderer.gl_context().clear(glow::COLOR_BUFFER_BIT);
@@ -108,7 +109,7 @@ fn screenshot_window(gl_ctx: &Rc<glow::Context>, (width, height): (i32, i32)) ->
     Ok(())
 }
 
-pub fn create<Loop: FnMut(&mut Ui, &mut AutoRenderer)>(main_loop: Loop) {
+pub fn create<Loop: FnMut(&mut Ui, &mut AutoRenderer) -> Result<()>>(main_loop: Loop) {
     let event_loop = EventLoop::new().unwrap();
     let mut app = app::App::new(main_loop);
     event_loop.run_app(&mut app).expect("could not run app");
