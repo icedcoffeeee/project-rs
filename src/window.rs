@@ -1,18 +1,20 @@
+use std::rc::Rc;
 use std::time::Instant;
 
 use imgui::Ui;
+use imgui_glow_renderer::glow::{self, HasContext};
 use imgui_glow_renderer::AutoRenderer;
-use winit::application::ApplicationHandler;
-use winit::event::{Event, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop};
-use winit::window::WindowId;
 
 use glutin::surface::GlSurface;
-use imgui_glow_renderer::glow::{self, HasContext};
+use winit::application::ApplicationHandler;
+use winit::event::{ElementState, Event, KeyEvent, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::window::WindowId;
 
-use crate::app::App;
+use crate::*;
 
-impl<Loop: FnMut(&mut Ui, &mut AutoRenderer)> ApplicationHandler for App<Loop> {
+impl<Loop: FnMut(&mut Ui, &mut AutoRenderer)> ApplicationHandler for app::App<Loop> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.setup(event_loop);
     }
@@ -57,6 +59,23 @@ impl<Loop: FnMut(&mut Ui, &mut AutoRenderer)> ApplicationHandler for App<Loop> {
                 let (surface, context) = self.surface.as_ref().unwrap();
                 surface.swap_buffers(&context).unwrap();
             }
+            WindowEvent::KeyboardInput { event, .. } => match event {
+                KeyEvent {
+                    physical_key: PhysicalKey::Code(keycode),
+                    state: ElementState::Pressed,
+                    ..
+                } => match keycode {
+                    KeyCode::Enter => {
+                        let renderer = self.renderer.as_mut().unwrap();
+                        let gl_ctx = renderer.gl_context();
+                        let physical_size: (i32, i32) =
+                            self.window.as_ref().unwrap().inner_size().into();
+                        screenshot_window(gl_ctx, physical_size).unwrap();
+                    }
+                    _ => {}
+                },
+                _ => {}
+            },
             WindowEvent::CloseRequested => event_loop.exit(),
             _ => {
                 self.platform.handle_event(
@@ -68,8 +87,29 @@ impl<Loop: FnMut(&mut Ui, &mut AutoRenderer)> ApplicationHandler for App<Loop> {
         }
     }
 }
+
+fn screenshot_window(gl_ctx: &Rc<glow::Context>, (width, height): (i32, i32)) -> Result<()> {
+    let (format, gltype) = (glow::BGR, glow::UNSIGNED_BYTE);
+    let mut rgb = [0; 3 * 1440 * 810];
+    let px = glow::PixelPackData::Slice(&mut rgb);
+    unsafe {
+        gl_ctx.pixel_store_i32(glow::PACK_ALIGNMENT, 4);
+        gl_ctx.read_buffer(glow::FRONT);
+        gl_ctx.read_pixels(0, 0, width, height, format, gltype, px);
+    }
+
+    let mut mat = Mat::default();
+    Mat::from_bytes_mut::<VecN<u8, 3>>(&mut rgb)?
+        .reshape(3, 810)?
+        .assign_to_def(&mut mat)?;
+    flip(&mat.clone(), &mut mat, 0)?;
+
+    imgcodecs::imwrite_def(&utils::get_save_filepath("screenshot.png"), &mat)?;
+    Ok(())
+}
+
 pub fn create<Loop: FnMut(&mut Ui, &mut AutoRenderer)>(main_loop: Loop) {
     let event_loop = EventLoop::new().unwrap();
-    let mut app = App::new(main_loop);
+    let mut app = app::App::new(main_loop);
     event_loop.run_app(&mut app).expect("could not run app");
 }

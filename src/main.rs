@@ -1,7 +1,7 @@
 use project::*;
 
 const DETECTION: bool = true;
-const DUAL_CAMERA: bool = true;
+const DUAL_CAMERA: bool = false;
 
 fn main() {
     let aspects = [[4, 3], [16, 9]];
@@ -172,7 +172,6 @@ fn main() {
                 for n in 0..3 {
                     ui.same_line();
                     if ui.button(format!("feed {}", n + 1)) {
-                        println!("{:?}", feeds[n].mat.size().unwrap());
                         imgcodecs::imwrite_def(
                             &utils::get_save_filepath(&format!("f{}.png", n + 1)),
                             &feeds[n].mat,
