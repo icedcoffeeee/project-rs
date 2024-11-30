@@ -1,4 +1,3 @@
-use opencv::Result;
 use std::time::Instant;
 
 use glutin::config::{Config, ConfigTemplateBuilder, GlConfig};
@@ -18,7 +17,9 @@ use winit::event_loop::ActiveEventLoop;
 use winit::raw_window_handle::HasWindowHandle;
 use winit::window::{Window, WindowAttributes};
 
-pub struct App<Loop: FnMut(&mut Ui, &mut AutoRenderer) -> Result<()>> {
+pub trait MainLoop = FnMut(&mut Ui, &mut AutoRenderer);
+
+pub struct App<Loop: MainLoop> {
     pub imgui: Context,
     pub platform: WinitPlatform,
     pub main_loop: Loop,
@@ -29,7 +30,7 @@ pub struct App<Loop: FnMut(&mut Ui, &mut AutoRenderer) -> Result<()>> {
     pub surface: Option<(Surface<WindowSurface>, PossiblyCurrentContext)>,
 }
 
-impl<Loop: FnMut(&mut Ui, &mut AutoRenderer) -> Result<()>> App<Loop> {
+impl<Loop: MainLoop> App<Loop> {
     pub fn new(main_loop: Loop) -> Self {
         let mut imgui = Context::create();
         let font_atlas = imgui.fonts();

@@ -1,234 +1,242 @@
 use project::*;
 
 const DETECTION: bool = true;
-const DUAL_CAMERA: bool = false;
+const DUAL_CAMERA: bool = true;
 
-fn main() -> Result<()> {
-    let aspects = [[4, 3], [16, 9]];
-    let mut base_px = 60;
-    let mut aspect = &aspects[0];
+#[derive(Default)]
+struct State {
+    base_px: i32,
+    win_size: i32,
+    win_shift: [i32; 2],
+    cam_shift: [i32; 2],
+    writer: Option<videoio::VideoWriter>,
+}
 
-    let [ind, cap] = match env::consts::OS {
-        "linux" => [2, videoio::CAP_V4L],
-        _ => [1, videoio::CAP_ANY],
-    };
-    let mut cameras = if DUAL_CAMERA {
-        [
-            videoio::VideoCapture::new(0, cap)?,
-            videoio::VideoCapture::new(ind, cap)?,
-        ]
-    } else {
-        [
-            videoio::VideoCapture::new(0, cap)?,
-            videoio::VideoCapture::default()?,
-        ]
-    };
-    let mjpg = videoio::VideoWriter::fourcc('m', 'j', 'p', 'g')? as f64;
-    for cam in &mut cameras {
-        cam.set(videoio::CAP_PROP_FOURCC, mjpg)?;
-    }
+type Cameras = [videoio::VideoCapture; 2];
+type Feeds = [image::Image; 3];
 
-    let mut feeds = [
-        image::Image::default(),
-        image::Image::default(),
-        image::Image::default(),
-    ];
+fn main() {
+    let mut s = State::default();
+    s.win_size = 100;
+    s.base_px = 60;
 
-    let mut shift_camera_2 = [0, 0];
-    let mut shift_left_window = [0, 0];
-    let mut window_size = 100;
-    let mut threshold = 10.;
-    let mut writer: Option<videoio::VideoWriter> = None;
+    let mut cameras = get_cameras();
+    let mut feeds: Feeds = Default::default();
 
-    let (t_feed, r_feed) = mpsc::channel();
-    let (t_detections, r_detections) = mpsc::channel();
-    let mut detections = None;
-    let mut first_send = true;
-    let mut classes: Option<Vec<String>> = None;
+    let mut channels = Channels::new();
+    let mut classes: Option<Classes> = None;
     if DETECTION {
-        thread::spawn(move || detection::initialize_thread(r_feed, t_detections));
+        detection::initialize_thread(channels.channel_there);
     }
 
     window::create(|ui, renderer| {
-        let img_size = Size::new(base_px * aspect[0], base_px * aspect[1]);
+        read_cameras(&mut cameras, &mut feeds);
 
-        for n in 0..cameras.len() {
-            if !cameras[[0, n][DUAL_CAMERA as usize]].read(&mut feeds[n].mat)? {
-                return Ok(());
-            }
+        let img_size = Size::new(s.base_px * 4, s.base_px * 3);
+        let [f0, f1, f2] = &mut feeds;
+
+        shift_cameras(&s, &mut f1.mat);
+
+        {
+            // DoLP = S1 / S0 = (I90 - I0) / (I90 + I0)
+            let [mut sub, mut _sum, _mask]: [Mat; 3] = Default::default();
+            absdiff(&f0.mat, &f1.mat, &mut sub).unwrap();
+            divide2_def(&sub, &f1.mat, &mut f2.mat).unwrap();
         }
-
-        if shift_camera_2.iter().any(|i| *i != 0) {
-            let size = feeds[1].mat.size()?;
-            let m = Mat::from_slice_2d(&[
-                [1., 0., -shift_camera_2[0] as f32],
-                [0., 1., -shift_camera_2[1] as f32],
-            ])?;
-            imgproc::warp_affine_def(&feeds[1].mat.clone(), &mut feeds[1].mat, &m, size)?;
-        }
-
-        absdiff(
-            &feeds[0].mat.clone(),
-            &feeds[1].mat.clone(),
-            &mut feeds[2].mat,
-        )?;
-        imgproc::threshold(
-            &feeds[2].mat.clone(),
-            &mut feeds[2].mat,
-            threshold,
-            255.,
-            imgproc::THRESH_TOZERO,
-        )?;
 
         if DETECTION {
-            if first_send {
-                first_send = false;
-                let _ = t_feed.send(feeds[0].mat.clone());
-            }
-            if let Ok(det) = r_detections.try_recv() {
-                detections = Some(det);
-                let _ = t_feed.send(feeds[0].mat.clone());
-            }
-            if let Some(ref detections) = detections {
-                detection::draw_bounding_boxes(&mut feeds[2].mat, &detections, &mut classes);
-            }
+            get_detections(
+                &channels.channel_here,
+                &mut channels.body,
+                &mut channels.first_sent,
+                &mut feeds,
+                &mut classes,
+            );
         }
 
-        let size = feeds[0].mat.size()?;
-        let mini_center = Rect::new(
-            (size.width - window_size) / 2,
-            (size.height - window_size) / 2,
-            window_size,
-            window_size,
-        );
-        let mini_left = Rect::new(
-            (size.width - window_size) / 2 + shift_left_window[0],
-            (size.height - window_size) / 2 + shift_left_window[1],
-            window_size,
-            window_size,
-        );
-        for feed in &mut feeds {
-            imgproc::rectangle_def(&mut feed.mat, mini_left, [0., 0., 0., 255.].into())?;
-            imgproc::rectangle_def(&mut feed.mat, mini_center, [0., 0., 0., 255.].into())?;
-        }
+        let mut mini: [Rect; 2] = Default::default();
+        draw_rois(&s, &mut feeds, &mut mini);
+        all_feed_windows(ui, renderer, &mut feeds, img_size);
 
-        for (n, feed) in feeds.iter_mut().enumerate() {
-            ui.window(["left", "right", "subtracted"][n])
+        ui.window("Control Panel")
+            .content_size([500., 500.])
+            .build(|| control_panel(&ui, &mut s, &mut feeds, &mut mini));
+    });
+}
+
+fn get_cameras() -> Cameras {
+    use env::consts::OS;
+    use videoio::VideoCapture as cam;
+    use videoio::{CAP_ANY, CAP_V4L};
+
+    const L: &str = "linux";
+    const D: bool = true;
+    match (OS, DUAL_CAMERA) {
+        (L, D) => [cam::new(0, CAP_V4L).unwrap(), cam::new(2, CAP_V4L).unwrap()],
+        (L, _) => [cam::new(0, CAP_V4L).unwrap(), cam::default().unwrap()],
+        (_, D) => [cam::new(0, CAP_ANY).unwrap(), cam::new(1, CAP_ANY).unwrap()],
+        (_, _) => [cam::new(0, CAP_ANY).unwrap(), cam::default().unwrap()],
+    }
+}
+
+fn read_cameras(cameras: &mut Cameras, feeds: &mut Feeds) {
+    for n in 0..cameras.len() {
+        cameras[[0, n][DUAL_CAMERA as usize]]
+            .read(&mut feeds[n].mat)
+            .unwrap();
+    }
+}
+
+fn shift_cameras(s: &State, mat: &mut Mat) {
+    if s.cam_shift.iter().any(|i| *i != 0) {
+        let size = mat.size().unwrap();
+        let m = Mat::from_slice_2d(&[
+            [1., 0., -s.cam_shift[0] as f32],
+            [0., 1., -s.cam_shift[1] as f32],
+        ])
+        .unwrap();
+        imgproc::warp_affine_def(&mat.clone(), mat, &m, size).unwrap();
+    }
+}
+
+fn get_detections(
+    channel: &Channel<Mat, Detections>,
+    detections: &mut Option<Detections>,
+    first_sent: &mut bool,
+    feeds: &mut Feeds,
+    classes: &mut Option<Classes>,
+) {
+    if channel
+        .send_on_receive(|det| {
+            *detections = Some(det);
+            feeds[0].mat.clone()
+        })
+        .is_err()
+    {
+        if !*first_sent {
+            *first_sent = false;
+            let _ = channel.0.send(feeds[0].mat.clone());
+        }
+    }
+    if let Some(ref det) = detections {
+        detection::draw(&mut feeds[2].mat, &det, classes);
+    }
+}
+
+fn draw_rois(s: &State, feeds: &mut Feeds, minis: &mut [Rect; 2]) {
+    let size = feeds[0].mat.size().unwrap();
+    let (wsize, shift) = (s.win_size, s.win_shift);
+    let [x, y] = [(size.width - wsize) / 2, (size.height - wsize) / 2];
+
+    let mini_center = Rect::new(x, y, wsize, wsize);
+    let mini_left = Rect::new(x + shift[0], y + shift[1], wsize, wsize);
+
+    for feed in feeds {
+        imgproc::rectangle_def(&mut feed.mat, mini_left, [0., 0., 0., 255.].into()).unwrap();
+        imgproc::rectangle_def(&mut feed.mat, mini_center, [0., 0., 0., 255.].into()).unwrap();
+    }
+
+    *minis = [mini_left, mini_center];
+}
+
+fn all_feed_windows(
+    ui: &window::Ui,
+    renderer: &mut window::AutoRenderer,
+    feeds: &mut Feeds,
+    img_size: Size,
+) {
+    for (n, feed) in feeds.iter_mut().enumerate() {
+        ui.window(["left", "right", "subtracted"][n])
+            .content_size(img_size.to_array())
+            .build(|| {
+                feed.make(renderer, img_size).build(ui);
+            });
+    }
+    {
+        let mut channels = Vector::<Mat>::new();
+        split(&feeds[2].mat, &mut channels).unwrap();
+        for (n, channel) in channels.iter().enumerate() {
+            let mut feed = image::Image::default();
+            channel.assign_to_def(&mut feed.mat).unwrap();
+
+            ui.window(["blue", "green", "red"][n])
                 .content_size(img_size.to_array())
                 .build(|| {
                     feed.make(renderer, img_size).build(ui);
                 });
         }
-        {
-            let mut channels = Vector::<Mat>::new();
-            split(&feeds[2].mat, &mut channels)?;
-            for (n, channel) in channels.iter().enumerate() {
-                let mut feed = image::Image::default();
-                channel.assign_to_def(&mut feed.mat)?;
+    }
+}
 
-                ui.window(["blue", "green", "red"][n])
-                    .content_size(img_size.to_array())
-                    .build(|| {
-                        feed.make(renderer, img_size).build(ui);
-                    });
+fn control_panel(ui: &&mut window::Ui, s: &mut State, feeds: &mut Feeds, minis: &mut [Rect; 2]) {
+    ui.slider("image base size", 1, 400, &mut s.base_px);
+
+    ui.text("calibration:");
+    ui.slider("camera 2 shift x", -400, 400, &mut s.cam_shift[0]);
+    ui.slider("camera 2 shift y", -400, 400, &mut s.cam_shift[1]);
+    ui.slider("window size", 1, 200, &mut s.win_size);
+
+    if ui.button("auto calibrate") {
+        calibrate::get_shift(&feeds[0].mat, &feeds[1].mat, s.win_size, &mut s.cam_shift);
+    };
+    ui.same_line();
+    if ui.button("reset") {
+        s.cam_shift = [0, 0];
+    };
+
+    ui.text("save:");
+    for n in 0..3 {
+        ui.same_line();
+        if ui.button(format!("feed {}", n + 1)) {
+            imgcodecs::imwrite_def(
+                &utils::get_save_filepath(&format!("f{}.png", n + 1)),
+                &feeds[n].mat,
+            )
+            .unwrap();
+        };
+    }
+
+    ui.text("recording:");
+    ui.same_line();
+    match s.writer {
+        Some(ref mut w) => {
+            w.write(&feeds[2].mat).unwrap();
+            if ui.button("stop") {
+                s.writer = None;
             }
         }
-
-        if let Some(writer) = writer.as_mut() {
-            writer.write(&feeds[2].mat)?;
+        None => {
+            let filepath = utils::get_save_filepath("out.mp4");
+            let avc1 = videoio::VideoWriter::fourcc('a', 'v', 'c', '1').unwrap();
+            let (fps, size) = (15., feeds[2].mat.size().unwrap());
+            let writer = videoio::VideoWriter::new(&filepath, avc1, fps, size, true).unwrap();
+            if ui.button("start") {
+                s.writer = Some(writer);
+            }
         }
-
-        ui.window("Control Panel")
-            .content_size([500., 500.])
-            .build::<Result<()>, _>(|| {
-                ui.slider("image base size", 1, 400, &mut base_px);
-
-                if let Some(_) =
-                    ui.begin_combo("aspect ratio", format!("{}x{}", aspect[0], aspect[1]))
-                {
-                    for a in &aspects {
-                        if aspect == a {
-                            ui.set_item_default_focus();
-                        }
-                        if ui
-                            .selectable_config(format!("{}x{}", a[0], a[1]))
-                            .selected(aspect == a)
-                            .build()
-                        {
-                            aspect = a;
-                        }
-                    }
-                };
-                ui.slider("threshold", 0., 255., &mut threshold);
-
-                ui.text("calibration:");
-                ui.slider("camera 2 shift x", -400, 400, &mut shift_camera_2[0]);
-                ui.slider("camera 2 shift y", -400, 400, &mut shift_camera_2[1]);
-                ui.slider("window size", 1, 200, &mut window_size);
-                if ui.button("auto calibrate") {
-                    calibrate::get_shift(
-                        &feeds[0].mat,
-                        &feeds[1].mat,
-                        window_size,
-                        &mut shift_camera_2,
-                    );
-                };
-                ui.same_line();
-                if ui.button("reset") {
-                    shift_camera_2 = [0, 0];
-                };
-
-                ui.text("save:");
-                for n in 0..3 {
-                    ui.same_line();
-                    if ui.button(format!("feed {}", n + 1)) {
-                        imgcodecs::imwrite_def(
-                            &utils::get_save_filepath(&format!("f{}.png", n + 1)),
-                            &feeds[n].mat,
-                        )?;
-                    };
+    }
+    ui.slider("left window x", -400, 400, &mut s.win_shift[0]);
+    ui.slider("left window y", -400, 400, &mut s.win_shift[1]);
+    for (a, mini) in minis.into_iter().enumerate() {
+        ui.new_line();
+        ui.text(["left", "center"][a]);
+        if let Some(_) = ui.begin_table_header(
+            "channel readings",
+            ["feeds", "red", "green", "blue"].map(|h| im::TableColumnSetup::new(h)),
+        ) {
+            for (n, feed) in feeds.iter().enumerate() {
+                let mut bgr = Vector::<Mat>::new();
+                split(&feed.mat.roi(*mini).unwrap(), &mut bgr).unwrap();
+                ui.table_next_column();
+                ui.text(format!("camera {}", n + 1));
+                for i in 0..3 {
+                    ui.table_next_column();
+                    ui.text(format!(
+                        "{:.2}",
+                        mean_def(&bgr.get(2 - i).unwrap()).unwrap()[0]
+                    ));
                 }
-
-                ui.text("recording:");
-                ui.same_line();
-                if writer.is_none() {
-                    if ui.button("start") {
-                        writer = Some(videoio::VideoWriter::new(
-                            &utils::get_save_filepath("out.mp4"),
-                            videoio::VideoWriter::fourcc('a', 'v', 'c', '1')?,
-                            15.,
-                            feeds[2].mat.size()?,
-                            true,
-                        )?);
-                    }
-                } else if ui.button("stop") {
-                    writer = None;
-                }
-
-                ui.slider("left window x", -400, 400, &mut shift_left_window[0]);
-                ui.slider("left window y", -400, 400, &mut shift_left_window[1]);
-                for (a, mini) in [mini_left, mini_center].into_iter().enumerate() {
-                    ui.new_line();
-                    ui.text(["left", "center"][a]);
-                    if let Some(_) = ui.begin_table_header(
-                        "channel readings",
-                        ["feeds", "red", "green", "blue"].map(|h| im::TableColumnSetup::new(h)),
-                    ) {
-                        for (n, feed) in feeds.iter().enumerate() {
-                            let mut bgr = Vector::<Mat>::new();
-                            split(&feed.mat.roi(mini)?, &mut bgr)?;
-                            ui.table_next_column();
-                            ui.text(format!("camera {}", n + 1));
-                            for i in 0..3 {
-                                ui.table_next_column();
-                                ui.text(format!("{:.2}", mean_def(&bgr.get(2 - i)?)?[0]));
-                            }
-                        }
-                    }
-                }
-                Ok(())
-            });
-        Ok(())
-    });
-    Ok(())
+            }
+        }
+    }
 }

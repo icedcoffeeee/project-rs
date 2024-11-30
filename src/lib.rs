@@ -1,3 +1,5 @@
+#![feature(trait_alias)]
+
 pub mod app;
 pub mod calibrate;
 pub mod detection;
@@ -12,6 +14,8 @@ pub use std::{sync::mpsc, thread};
 
 pub use opencv::{core::*, prelude::*};
 pub use opencv::{dnn, imgcodecs, imgproc, videoio, Result};
+
+pub use detection::*;
 
 pub trait SizeToArray {
     fn to_array(self) -> [f32; 2];

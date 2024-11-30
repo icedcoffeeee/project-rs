@@ -17,13 +17,3 @@ winit = "0.30.5"
 [profile.dev.package.imgui]
 opt-level = 2
 debug-assertions = false
-
-[profile.windowsd.package.imgui]
-opt-level = 2
-debug-assertions = false
-
-[profile.windowsd]
-inherits = "dev"
-
-[profile.windows]
-inherits = "release"

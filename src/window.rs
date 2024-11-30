@@ -2,9 +2,9 @@ use opencv::Result;
 use std::rc::Rc;
 use std::time::Instant;
 
-use imgui::Ui;
+pub use imgui::Ui;
 use imgui_glow_renderer::glow::{self, HasContext};
-use imgui_glow_renderer::AutoRenderer;
+pub use imgui_glow_renderer::AutoRenderer;
 
 use glutin::surface::GlSurface;
 use winit::application::ApplicationHandler;
@@ -13,9 +13,9 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::WindowId;
 
-use crate::*;
+use crate::app::{App, MainLoop};
 
-impl<Loop: FnMut(&mut Ui, &mut AutoRenderer) -> Result<()>> ApplicationHandler for app::App<Loop> {
+impl<Loop: MainLoop> ApplicationHandler for App<Loop> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.setup(event_loop);
     }
@@ -46,7 +46,7 @@ impl<Loop: FnMut(&mut Ui, &mut AutoRenderer) -> Result<()>> ApplicationHandler f
                 self.platform
                     .prepare_render(ui, self.window.as_ref().unwrap());
 
-                (self.main_loop)(ui, renderer).unwrap();
+                (self.main_loop)(ui, renderer);
 
                 unsafe {
                     renderer.gl_context().clear(glow::COLOR_BUFFER_BIT);
@@ -90,6 +90,10 @@ impl<Loop: FnMut(&mut Ui, &mut AutoRenderer) -> Result<()>> ApplicationHandler f
 }
 
 fn screenshot_window(gl_ctx: &Rc<glow::Context>, (width, height): (i32, i32)) -> Result<()> {
+    use crate::utils;
+    use opencv::core::*;
+    use opencv::imgcodecs;
+
     let (format, gltype) = (glow::BGR, glow::UNSIGNED_BYTE);
     let mut rgb = [0; 3 * 1440 * 810];
     let px = glow::PixelPackData::Slice(&mut rgb);
@@ -109,8 +113,8 @@ fn screenshot_window(gl_ctx: &Rc<glow::Context>, (width, height): (i32, i32)) ->
     Ok(())
 }
 
-pub fn create<Loop: FnMut(&mut Ui, &mut AutoRenderer) -> Result<()>>(main_loop: Loop) {
+pub fn create(main_loop: impl MainLoop) {
     let event_loop = EventLoop::new().unwrap();
-    let mut app = app::App::new(main_loop);
+    let mut app = App::new(main_loop);
     event_loop.run_app(&mut app).expect("could not run app");
 }
