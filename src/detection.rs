@@ -61,7 +61,7 @@ pub fn initialize_thread(channel: Channel<Detections, Mat>) {
                 if !init {
                     init = true;
                     model.set_input_size(feed.size().unwrap()).unwrap();
-                    model.set_input_scale(0.001).unwrap();
+                    model.set_input_scale(0.001.into()).unwrap();
                     model.set_input_mean([0.; 4].into()).unwrap();
                     model.set_input_swap_rb(true).unwrap();
                 }

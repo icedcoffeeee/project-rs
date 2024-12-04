@@ -30,7 +30,9 @@ fn main() {
     }
 
     window::create(|ui, renderer| {
-        read_cameras(&mut cameras, &mut feeds);
+        if !read_cameras(&mut cameras, &mut feeds) {
+            return;
+        };
 
         let img_size = Size::new(s.base_px * 4, s.base_px * 3);
         let [f0, f1, f2] = &mut feeds;
@@ -81,12 +83,15 @@ fn get_cameras() -> Cameras {
     }
 }
 
-fn read_cameras(cameras: &mut Cameras, feeds: &mut Feeds) {
-    for n in 0..cameras.len() {
-        cameras[[0, n][DUAL_CAMERA as usize]]
-            .read(&mut feeds[n].mat)
-            .unwrap();
-    }
+/// returns true if all cameras are read successfully
+fn read_cameras(cameras: &mut Cameras, feeds: &mut Feeds) -> bool {
+    (0..cameras.len())
+        .map(|n| {
+            cameras[[0, n][DUAL_CAMERA as usize]]
+                .read(&mut feeds[n].mat)
+                .unwrap()
+        })
+        .any(|x| x)
 }
 
 fn shift_cameras(s: &State, mat: &mut Mat) {
