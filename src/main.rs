@@ -1,6 +1,6 @@
 use project::*;
 
-const DETECTION: bool = true;
+const DETECTION: bool = false;
 const DUAL_CAMERA: bool = true;
 
 #[derive(Default)]
@@ -18,7 +18,7 @@ type Feeds = [image::Image; 3];
 fn main() {
     let mut s = State::default();
     s.win_size = 100;
-    s.base_px = 60;
+    s.base_px = 80;
 
     let mut cameras = get_cameras();
     let mut feeds: Feeds = Default::default();
@@ -35,11 +35,13 @@ fn main() {
         let img_size = Size::new(s.base_px * 4, s.base_px * 3);
         let [f0, f1, f2] = &mut feeds;
 
+        flip(&f0.mat.clone(), &mut f0.mat, -1).unwrap();
+        flip(&f1.mat.clone(), &mut f1.mat, 0).unwrap();
         shift_cameras(&s, &mut f1.mat);
 
         {
             // DoLP = S1 / S0 = (I90 - I0) / (I90 + I0)
-            let [mut sub, mut _sum, _mask]: [Mat; 3] = Default::default();
+            let mut sub = Mat::default();
             absdiff(&f0.mat, &f1.mat, &mut sub).unwrap();
             divide2_def(&sub, &f1.mat, &mut f2.mat).unwrap();
         }

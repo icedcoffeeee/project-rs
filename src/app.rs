@@ -59,6 +59,7 @@ impl<Loop: MainLoop> App<Loop> {
         let size = PhysicalSize::new(1920 * 3 / 4, 1080 * 3 / 4);
         let wind_attr = WindowAttributes::default()
             .with_title("project")
+            .with_maximized(true)
             .with_inner_size(size);
         let template = ConfigTemplateBuilder::new();
         let compare_conf = |a: &Config, b: &Config| a.num_samples().cmp(&b.num_samples());
