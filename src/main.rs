@@ -1,7 +1,7 @@
 use project::*;
 
-const DETECTION: bool = false;
-const DUAL_CAMERA: bool = true;
+const DETECTION: bool = true;
+const DUAL_CAMERA: bool = false;
 
 #[derive(Default)]
 struct State {
@@ -37,15 +37,17 @@ fn main() {
         let img_size = Size::new(s.base_px * 4, s.base_px * 3);
         let [f0, f1, f2] = &mut feeds;
 
-        flip(&f0.mat.clone(), &mut f0.mat, -1).unwrap();
-        flip(&f1.mat.clone(), &mut f1.mat, 0).unwrap();
+        //flip(&f0.mat.clone(), &mut f0.mat, -1).unwrap();
+        //flip(&f1.mat.clone(), &mut f1.mat, 0).unwrap();
         shift_cameras(&s, &mut f1.mat);
 
         {
             // DoLP = S1 / S0 = (I90 - I0) / (I90 + I0)
-            let mut sub = Mat::default();
+            let [mut sub, mut sum, mask]: [Mat; 3] = Default::default();
             absdiff(&f0.mat, &f1.mat, &mut sub).unwrap();
-            divide2_def(&sub, &f1.mat, &mut f2.mat).unwrap();
+            sub.clone().convert_to_def(&mut sub, CV_32SC3).unwrap();
+            add(&f0.mat, &f1.mat, &mut sum, &mask, CV_32SC3).unwrap();
+            divide2(&sub, &sum, &mut f2.mat, 1., CV_8UC3).unwrap();
         }
 
         if DETECTION {
@@ -91,7 +93,7 @@ fn read_cameras(cameras: &mut Cameras, feeds: &mut Feeds) -> bool {
                 .read(&mut feeds[n].mat)
                 .unwrap()
         })
-        .any(|x| x)
+        .all(|x| x)
 }
 
 fn shift_cameras(s: &State, mat: &mut Mat) {
@@ -154,6 +156,7 @@ fn all_feed_windows(
 ) {
     for (n, feed) in feeds.iter_mut().enumerate() {
         ui.window(["left", "right", "subtracted"][n])
+            .size([0., 0.], im::Condition::Always)
             .content_size(img_size.to_array())
             .build(|| {
                 feed.make(renderer, img_size).build(ui);
@@ -167,6 +170,7 @@ fn all_feed_windows(
             channel.assign_to_def(&mut feed.mat).unwrap();
 
             ui.window(["blue", "green", "red"][n])
+                .size([0., 0.], im::Condition::Always)
                 .content_size(img_size.to_array())
                 .build(|| {
                     feed.make(renderer, img_size).build(ui);
