@@ -1,7 +1,7 @@
 use project::*;
 
-const DETECTION: bool = true;
-const DUAL_CAMERA: bool = false;
+const DETECTION: bool = false;
+const DUAL_CAMERA: bool = true;
 
 #[derive(Default)]
 struct State {
@@ -16,9 +16,13 @@ type Cameras = [videoio::VideoCapture; 2];
 type Feeds = [image::Image; 3];
 
 fn main() {
-    let mut s = State::default();
-    s.win_size = 100;
-    s.base_px = 80;
+    let mut s = State {
+        base_px: 80,
+        win_size: 100,
+        win_shift: [0, 0],
+        cam_shift: [0, 0],
+        writer: None,
+    };
 
     let mut cameras = get_cameras();
     let mut feeds: Feeds = Default::default();
@@ -37,17 +41,22 @@ fn main() {
         let img_size = Size::new(s.base_px * 4, s.base_px * 3);
         let [f0, f1, f2] = &mut feeds;
 
-        //flip(&f0.mat.clone(), &mut f0.mat, -1).unwrap();
-        //flip(&f1.mat.clone(), &mut f1.mat, 0).unwrap();
+        flip(&f0.mat.clone(), &mut f0.mat, -1).unwrap();
+        flip(&f1.mat.clone(), &mut f1.mat, 0).unwrap();
         shift_cameras(&s, &mut f1.mat);
 
         {
             // DoLP = S1 / S0 = (I90 - I0) / (I90 + I0)
-            let [mut sub, mut sum, mask]: [Mat; 3] = Default::default();
-            absdiff(&f0.mat, &f1.mat, &mut sub).unwrap();
-            sub.clone().convert_to_def(&mut sub, CV_32SC3).unwrap();
-            add(&f0.mat, &f1.mat, &mut sum, &mask, CV_32SC3).unwrap();
-            divide2(&sub, &sum, &mut f2.mat, 1., CV_8UC3).unwrap();
+            //let [mut sub, mut sum, mask]: [Mat; 3] = Default::default();
+            //absdiff(&f0.mat, &f1.mat, &mut sub).unwrap();
+            //sub.clone().convert_to_def(&mut sub, CV_32SC3).unwrap();
+            //add(&f0.mat, &f1.mat, &mut sum, &mask, CV_32SC3).unwrap();
+            //divide2(&sub, &f1.mat, &mut f2.mat, 1., CV_8UC3).unwrap();
+            let mut sub = Mat::default();
+            let mut sum = Mat::default();
+            subtract_def(&f0.mat, &f1.mat, &mut sub).unwrap();
+            add_def(&f0.mat, &f1.mat, &mut sum).unwrap();
+            divide2_def(&sub, &f1.mat, &mut f2.mat).unwrap();
         }
 
         if DETECTION {

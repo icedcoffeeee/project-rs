@@ -1,5 +1,3 @@
-#![feature(trait_alias)]
-
 pub mod app;
 pub mod calibrate;
 pub mod detection;

@@ -17,7 +17,8 @@ use winit::event_loop::ActiveEventLoop;
 use winit::raw_window_handle::HasWindowHandle;
 use winit::window::{Window, WindowAttributes};
 
-pub trait MainLoop = FnMut(&mut Ui, &mut AutoRenderer);
+pub trait MainLoop: FnMut(&mut Ui, &mut AutoRenderer) {}
+impl<T> MainLoop for T where T: FnMut(&mut Ui, &mut AutoRenderer) {}
 
 pub struct App<Loop: MainLoop> {
     pub imgui: Context,
