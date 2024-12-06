@@ -226,11 +226,11 @@ fn control_panel(ui: &&mut window::Ui, s: &mut State, feeds: &mut Feeds, minis: 
             }
         }
         None => {
-            let filepath = utils::get_save_filepath("out.mp4");
-            let avc1 = videoio::VideoWriter::fourcc('a', 'v', 'c', '1').unwrap();
-            let (fps, size) = (15., feeds[2].mat.size().unwrap());
-            let writer = videoio::VideoWriter::new(&filepath, avc1, fps, size, true).unwrap();
             if ui.button("start") {
+                let filepath = utils::get_save_filepath("out.mp4");
+                let avc1 = videoio::VideoWriter::fourcc('a', 'v', 'c', '1').unwrap();
+                let (fps, size) = (15., feeds[2].mat.size().unwrap());
+                let writer = videoio::VideoWriter::new(&filepath, avc1, fps, size, true).unwrap();
                 s.writer = Some(writer);
             }
         }

@@ -95,7 +95,9 @@ fn screenshot_window(gl_ctx: &Rc<glow::Context>, (width, height): (i32, i32)) ->
     use opencv::imgcodecs;
 
     let (format, gltype) = (glow::BGR, glow::UNSIGNED_BYTE);
-    let mut rgb = [0; 3 * 1440 * 810];
+    let mut rgb = Vec::new();
+    rgb.resize((3 * width * height) as usize, 0 as u8);
+    let mut rgb = rgb.as_mut_slice();
     let px = glow::PixelPackData::Slice(&mut rgb);
     unsafe {
         gl_ctx.pixel_store_i32(glow::PACK_ALIGNMENT, 4);
@@ -104,12 +106,15 @@ fn screenshot_window(gl_ctx: &Rc<glow::Context>, (width, height): (i32, i32)) ->
     }
 
     let mut mat = Mat::default();
-    Mat::from_bytes_mut::<VecN<u8, 3>>(&mut rgb)?
-        .reshape(3, 810)?
-        .assign_to_def(&mut mat)?;
-    flip(&mat.clone(), &mut mat, 0)?;
+    Mat::from_bytes_mut::<VecN<u8, 3>>(&mut rgb)
+        .unwrap()
+        .reshape(3, height)
+        .unwrap()
+        .assign_to_def(&mut mat)
+        .unwrap();
+    flip(&mat.clone(), &mut mat, 0).unwrap();
 
-    imgcodecs::imwrite_def(&utils::get_save_filepath("screenshot.png"), &mat)?;
+    imgcodecs::imwrite_def(&utils::get_save_filepath("screenshot.png"), &mat).unwrap();
     Ok(())
 }
 
