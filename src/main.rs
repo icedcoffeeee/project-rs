@@ -1,7 +1,7 @@
 use project::*;
 
 const DETECTION: bool = false;
-const DUAL_CAMERA: bool = false;
+const DUAL_CAMERA: bool = true;
 
 #[derive(Default)]
 struct State {
@@ -20,7 +20,7 @@ fn main() {
         base_px: 80,
         win_size: 100,
         win_shift: [0, 0],
-        cam_shift: [0, 0],
+        cam_shift: [112, 11],
         writer: None,
     };
 
@@ -55,7 +55,9 @@ fn main() {
             //add(&f0.mat, &f1.mat, &mut sum, &mask, CV_32SC3).unwrap();
             //divide2(&sub, &f1.mat, &mut f2.mat, 1., CV_8UC3).unwrap();
             //let mut sub = Mat::default();
+            //let mut sum = Mat::default();
             absdiff(&f0.mat, &f1.mat, &mut f2.mat).unwrap();
+            //add_def(&f0.mat, &f1.mat, &mut sum).unwrap();
             //divide2_def(&sub, &f1.mat, &mut f2.mat).unwrap();
         }
 
