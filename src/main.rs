@@ -1,7 +1,13 @@
+use clap::Parser;
 use project::*;
 
-const DETECTION: bool = false;
-const DUAL_CAMERA: bool = true;
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long, default_value_t = false)]
+    detection: bool,
+    #[arg(short, long, default_value_t = false)]
+    camera: bool,
+}
 
 #[derive(Default)]
 struct State {
@@ -16,6 +22,7 @@ type Cameras = [videoio::VideoCapture; 2];
 type Feeds = [image::Image; 5];
 
 fn main() {
+    let args = Args::parse();
     let mut s = State {
         base_px: 80,
         win_size: 35,
@@ -24,24 +31,24 @@ fn main() {
         writer: None,
     };
 
-    let mut cameras = get_cameras();
+    let mut cameras = get_cameras(!args.camera);
     let mut feeds: Feeds = Default::default();
 
     let mut channels = Channels::new();
     let mut classes: Option<Classes> = None;
-    if DETECTION {
+    if args.detection {
         detection::initialize_thread(channels.channel_there);
     }
 
     window::create(|ui, renderer| {
-        if !read_cameras(&mut cameras, &mut feeds) {
+        if !read_cameras(&mut cameras, &mut feeds, !args.camera) {
             return;
         };
 
         let img_size = Size::new(s.base_px * 4, s.base_px * 3);
         let [f0, f1, f2, f00, f10] = &mut feeds;
 
-        if DUAL_CAMERA {
+        if !args.camera {
             flip(&f0.mat.clone(), &mut f0.mat, -1).unwrap();
             flip(&f1.mat.clone(), &mut f1.mat, 0).unwrap();
         }
@@ -58,7 +65,7 @@ fn main() {
             //divide2(&sub, &f1.mat, &mut f2.mat, 255., CV_8UC3).unwrap();
         }
 
-        if DETECTION {
+        if args.detection {
             get_detections(
                 &channels.channel_here,
                 &mut channels.body,
@@ -78,14 +85,14 @@ fn main() {
     });
 }
 
-fn get_cameras() -> Cameras {
+fn get_cameras(dual_camera: bool) -> Cameras {
     use env::consts::OS;
     use videoio::VideoCapture as cam;
     use videoio::{CAP_ANY, CAP_V4L};
 
     const L: &str = "linux";
     const D: bool = true;
-    match (OS, DUAL_CAMERA) {
+    match (OS, dual_camera) {
         (L, D) => [cam::new(0, CAP_V4L).unwrap(), cam::new(2, CAP_V4L).unwrap()],
         (L, _) => [cam::new(0, CAP_V4L).unwrap(), cam::default().unwrap()],
         (_, D) => [cam::new(0, CAP_ANY).unwrap(), cam::new(1, CAP_ANY).unwrap()],
@@ -94,10 +101,10 @@ fn get_cameras() -> Cameras {
 }
 
 /// returns true if all cameras are read successfully
-fn read_cameras(cameras: &mut Cameras, feeds: &mut Feeds) -> bool {
+fn read_cameras(cameras: &mut Cameras, feeds: &mut Feeds, dual_camera: bool) -> bool {
     (0..cameras.len())
         .map(|n| {
-            cameras[[0, n][DUAL_CAMERA as usize]]
+            cameras[[0, n][dual_camera as usize]]
                 .read(&mut feeds[n].mat)
                 .unwrap()
         })
