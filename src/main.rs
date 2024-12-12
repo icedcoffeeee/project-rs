@@ -13,13 +13,13 @@ struct State {
 }
 
 type Cameras = [videoio::VideoCapture; 2];
-type Feeds = [image::Image; 3];
+type Feeds = [image::Image; 5];
 
 fn main() {
     let mut s = State {
         base_px: 80,
-        win_size: 100,
-        win_shift: [0, 0],
+        win_size: 35,
+        win_shift: [-100, 0],
         cam_shift: [112, 11],
         writer: None,
     };
@@ -39,7 +39,7 @@ fn main() {
         };
 
         let img_size = Size::new(s.base_px * 4, s.base_px * 3);
-        let [f0, f1, f2] = &mut feeds;
+        let [f0, f1, f2, f00, f10] = &mut feeds;
 
         if DUAL_CAMERA {
             flip(&f0.mat.clone(), &mut f0.mat, -1).unwrap();
@@ -49,16 +49,13 @@ fn main() {
 
         {
             // DoLP = S1 / S0 = (I90 - I0) / (I90 + I0)
-            //let [mut sub, mut sum, mask]: [Mat; 3] = Default::default();
-            //absdiff(&f0.mat, &f1.mat, &mut sub).unwrap();
-            //sub.clone().convert_to_def(&mut sub, CV_32SC3).unwrap();
-            //add(&f0.mat, &f1.mat, &mut sum, &mask, CV_32SC3).unwrap();
-            //divide2(&sub, &f1.mat, &mut f2.mat, 1., CV_8UC3).unwrap();
             //let mut sub = Mat::default();
-            //let mut sum = Mat::default();
+            if !&f00.mat.empty() && !f10.mat.empty() {
+                absdiff(&f0.mat.clone(), &f00.mat, &mut f0.mat).unwrap();
+                absdiff(&f1.mat.clone(), &f10.mat, &mut f1.mat).unwrap();
+            }
             absdiff(&f0.mat, &f1.mat, &mut f2.mat).unwrap();
-            //add_def(&f0.mat, &f1.mat, &mut sum).unwrap();
-            //divide2_def(&sub, &f1.mat, &mut f2.mat).unwrap();
+            //divide2(&sub, &f1.mat, &mut f2.mat, 255., CV_8UC3).unwrap();
         }
 
         if DETECTION {
@@ -165,12 +162,12 @@ fn all_feed_windows(
     feeds: &mut Feeds,
     img_size: Size,
 ) {
-    for (n, feed) in feeds.iter_mut().enumerate() {
+    for n in 0..3 {
         ui.window(["left", "right", "subtracted"][n])
             .size([0., 0.], im::Condition::Always)
             .content_size(img_size.to_array())
             .build(|| {
-                feed.make(renderer, img_size).build(ui);
+                feeds[n].make(renderer, img_size).build(ui);
             });
     }
     {
@@ -205,6 +202,16 @@ fn control_panel(ui: &&mut window::Ui, s: &mut State, feeds: &mut Feeds, minis: 
     if ui.button("reset") {
         s.cam_shift = [0, 0];
     };
+
+    if ui.button("save null") {
+        feeds[5 - 2].mat.set(feeds[0].mat.clone()).unwrap();
+        feeds[5 - 1].mat.set(feeds[1].mat.clone()).unwrap();
+    }
+    ui.same_line();
+    if ui.button("reset null") {
+        feeds[5 - 2].mat.set(Mat::default()).unwrap();
+        feeds[5 - 1].mat.set(Mat::default()).unwrap();
+    }
 
     ui.text("save:");
     for n in 0..3 {
@@ -246,9 +253,9 @@ fn control_panel(ui: &&mut window::Ui, s: &mut State, feeds: &mut Feeds, minis: 
             "channel readings",
             ["feeds", "red", "green", "blue"].map(|h| im::TableColumnSetup::new(h)),
         ) {
-            for (n, feed) in feeds.iter().enumerate() {
+            for n in 0..3 {
                 let mut bgr = Vector::<Mat>::new();
-                split(&feed.mat.roi(*mini).unwrap(), &mut bgr).unwrap();
+                split(&feeds[n].mat.roi(*mini).unwrap(), &mut bgr).unwrap();
                 ui.table_next_column();
                 ui.text(format!("camera {}", n + 1));
                 for i in 0..3 {
