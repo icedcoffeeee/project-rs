@@ -1,4 +1,4 @@
-# project-rs: imgui + opencv + sdl2
+# project-rs: imgui + opencv
 
 ## development
 
@@ -37,7 +37,7 @@ cd project-rs
 cargo build
 ```
 
-### object detection
+### object detection (optional)
 - dataset/configs in `data` folder are from yolov3.
     - `wget https://pjreddie.com/media/files/yolov3-spp.weights yolov3.weights`
     - `wget https://raw.githubusercontent.com/pjreddie/darknet/refs/heads/master/cfg/yolov3-spp.cfg yolov3.cfg`
