@@ -1,4 +1,3 @@
-use clap::Parser;
 use project::*;
 
 #[derive(Parser, Debug)]
@@ -26,8 +25,8 @@ fn main() {
     let mut s = State {
         base_px: 80,
         win_size: 35,
-        win_shift: [-100, 0],
-        cam_shift: [112, 11],
+        win_shift: [-93, 0],
+        cam_shift: [-138, -50],
         writer: None,
     };
 
@@ -62,7 +61,7 @@ fn main() {
                 absdiff(&f1.mat.clone(), &f10.mat, &mut f1.mat).unwrap();
             }
             absdiff(&f0.mat, &f1.mat, &mut f2.mat).unwrap();
-            //divide2(&sub, &f1.mat, &mut f2.mat, 255., CV_8UC3).unwrap();
+            //divide2(&f2.mat.clone(), &f1.mat, &mut f2.mat, 255., CV_8UC3).unwrap();
         }
 
         if args.detection {

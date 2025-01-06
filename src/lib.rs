@@ -10,6 +10,7 @@ pub use std::{env, os, str};
 pub use std::{fs, path};
 pub use std::{sync::mpsc, thread};
 
+pub use clap::Parser;
 pub use opencv::{core::*, prelude::*};
 pub use opencv::{dnn, imgcodecs, imgproc, videoio, Result};
 
