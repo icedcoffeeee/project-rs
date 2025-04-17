@@ -2,13 +2,13 @@
 #![windows_subsystem = "windows"]
 
 fn main() {
-    let mut camera = refim::camera::Camera::new();
+    let mut camera = refim::camera::Camera::new(0);
     let mut image1 = refim::image::Image::default();
     let mut image2 = refim::image::Image::default();
     let mut image3 = refim::image::Image::default();
 
     refim::window::new("ReFim", [1200, 700], move |ui, wdata| {
-        let (w, h) = (camera.stream.width, camera.stream.height);
+        let (w, h) = camera.resolution();
 
         ui.window("Controls").build(|| {});
         ui.window("Logs").build(|| {});
@@ -20,8 +20,8 @@ fn main() {
 
             let dim = (w as u32, h as u32);
             let size = Some(((w * factor) as u32, (h * factor) as u32));
-            let im1 = camera.get_frame();
-            let im2 = camera.get_frame();
+            let im1 = camera.get();
+            let im2 = camera.get();
 
             image1.make(im1, dim, size, ui, wdata.display, wdata.renderer.textures());
             ui.same_line();
