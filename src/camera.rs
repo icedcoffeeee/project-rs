@@ -1,3 +1,4 @@
+use image::GenericImageView;
 use nokhwa::pixel_format::RgbFormat;
 use nokhwa::utils::*;
 
@@ -22,5 +23,19 @@ impl Camera {
     pub fn resolution(&self) -> (u32, u32) {
         let res = self.camera.resolution();
         return (res.width(), res.height());
+    }
+}
+
+/// For testing
+pub struct ImageCamera(pub Option<image::DynamicImage>);
+impl ImageCamera {
+    pub fn new(_: u32) -> Self {
+        Self(None)
+    }
+    pub fn get(&mut self) -> Vec<u8> {
+        self.0.clone().unwrap().to_rgb8().to_vec()
+    }
+    pub fn resolution(&self) -> (u32, u32) {
+        self.0.clone().unwrap().dimensions()
     }
 }
