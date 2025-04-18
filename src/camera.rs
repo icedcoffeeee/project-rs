@@ -27,15 +27,15 @@ impl Camera {
 }
 
 /// For testing
-pub struct ImageCamera(pub Option<image::DynamicImage>);
+pub struct ImageCamera(pub image::DynamicImage);
 impl ImageCamera {
-    pub fn new(_: u32) -> Self {
-        Self(None)
+    pub fn new(path: &str) -> Self {
+        Self(image::open(path).unwrap())
     }
     pub fn get(&mut self) -> Vec<u8> {
-        self.0.clone().unwrap().to_rgb8().to_vec()
+        self.0.clone().to_rgb8().to_vec()
     }
     pub fn resolution(&self) -> (u32, u32) {
-        self.0.clone().unwrap().dimensions()
+        self.0.clone().dimensions()
     }
 }

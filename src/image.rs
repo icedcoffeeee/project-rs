@@ -10,7 +10,7 @@ use imgui_glium_renderer::Texture;
 
 use crate::window::WindowData;
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct Image(Option<TextureId>);
 
 impl Image {
@@ -53,4 +53,11 @@ impl Image {
         let (w, h) = size;
         imgui::Image::new(id, [w as f32, h as f32])
     }
+}
+
+pub fn get_channel(data: &[u8], m: usize) -> Vec<u8> {
+    data.iter()
+        .enumerate()
+        .map(|(n, i)| if (n + m) % 3 == 0 { *i as u8 } else { 0 })
+        .collect()
 }

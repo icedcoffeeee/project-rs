@@ -38,6 +38,7 @@ pub fn new_with_startup<FInit, FUi>(
 
     let window_attributes = WindowAttributes::default()
         .with_title(title)
+        .with_maximized(true)
         .with_inner_size(LogicalSize::<i32>::from(size));
     let (window, display) = glium::backend::glutin::SimpleWindowBuilder::new()
         .set_window_builder(window_attributes)
