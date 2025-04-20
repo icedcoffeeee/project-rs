@@ -11,7 +11,7 @@ use imgui_glium_renderer::Texture;
 use crate::window::WindowData;
 
 #[derive(Default, Clone, Copy)]
-pub struct Image(Option<TextureId>);
+pub struct Image(pub Option<TextureId>);
 
 impl Image {
     pub fn get_texture(
